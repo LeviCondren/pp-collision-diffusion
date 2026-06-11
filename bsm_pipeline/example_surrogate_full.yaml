@@ -1,0 +1,50 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# BSM Pipeline config: full surrogate chain
+#   MG5 → FPCD (shower surrogate) → Parnassus (detector surrogate)
+# Run: python run_pipeline.py --config example_surrogate_full.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+
+model:
+  name: DarkPhoton
+  ufo_path: /path/to/DarkPhoton_UFO
+  process: "p p > zp > j j"    # hadronic process; FPCD maps partons → jets
+
+parameters:
+  MZp: 1000.0    # Z' mass [GeV] — keep in JetNet training range [800, 1600]
+  WZp: 10.0
+  gq:  0.1
+
+generation:
+  n_events:   5000
+  nb_core:    32
+  energy_gev: 13000.
+  seed:       42
+  use_gridpack: false
+
+# Stage 2 shower surrogate: FPCD (GSGM Stage 2 conditioned on LHE parton kinematics)
+# Bypasses Pythia8; runs the pre-trained JetNet DDPM model inside Shifter.
+shower:
+  backend: fpcd
+  gsgm_dir: /pscratch/sd/l/lcondren/MCsim/GSGM
+  npart: 30          # 30 or 150 particles per jet
+  distill: true      # use 1-step distilled model (fast)
+
+# Detector surrogate: Parnassus pre-trained CMS flow-matching model
+# Converts truth particle cloud → PF candidates (pT, eta, phi).
+# Bypasses Delphes; uses pipeline_copy-gpu2 conda env on GPU.
+detector:
+  enabled: true
+  backend: parnassus
+  # All fields below are optional — defaults point to pre-trained CMS weights
+  # checkpoint: /pscratch/sd/l/lcondren/MCsim/Parnassus/trained_models/fm_cms_J800_1000_epoch=49.ckpt
+  # config:     /pscratch/sd/l/lcondren/MCsim/Parnassus/configs/fm_cms_J800_1000.json
+  # n_steps:    25
+  # batch_size: 256
+  # device:     cuda
+
+output:
+  dir:      /pscratch/sd/l/lcondren/MCsim/surrogate_pipeline_output
+  work_dir: /pscratch/sd/l/lcondren/MCsim/surrogate_pipeline_work
+  save_lhe:   true
+  save_numpy: true
+  save_hepmc: false   # .fpcd.npz shower output is not HepMC; set true to keep it

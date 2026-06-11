@@ -1,0 +1,36 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# BSM Pipeline config: dark photon, FPCD shower backend
+# Run: python run_pipeline.py --config example_fpcd.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+
+model:
+  name: DarkPhoton
+  ufo_path: /path/to/DarkPhoton_UFO
+  process: "p p > zp > j j"    # hadronic Z' → qq (where FPCD applies)
+
+parameters:
+  MZp: 1000.0    # Z' mass [GeV] — in JetNet training range
+  WZp: 10.0
+  gq:  0.1
+
+generation:
+  n_events:   5000
+  nb_core:    32
+  energy_gev: 13000.
+  seed:       42
+  use_gridpack: false
+
+shower:
+  backend: fpcd
+  gsgm_dir: /pscratch/sd/l/lcondren/MCsim/GSGM
+  npart: 30          # 30 or 150 particles per jet
+  distill: true      # use 1-step distilled model (fast)
+
+detector:
+  enabled: false
+
+output:
+  dir:      /pscratch/sd/l/lcondren/MCsim/fpcd_pipeline_output
+  work_dir: /pscratch/sd/l/lcondren/MCsim/fpcd_pipeline_work
+  save_lhe:   true
+  save_numpy: true

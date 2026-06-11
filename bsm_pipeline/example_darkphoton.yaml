@@ -1,0 +1,53 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# BSM Pipeline config: Dark Photon model (existing infrastructure)
+# Run: python run_pipeline.py --config example_darkphoton.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+
+model:
+  name: DarkPhoton
+  ufo_path: /pscratch/sd/l/lcondren/MCsim/models/DarkPhoton_UFO   # path to UFO dir
+  process: "p p > zp > e+ e-"       # MG5 process string
+
+parameters:
+  # Single parameter point (used unless --scan is given)
+  MAp:  20.0     # dark photon mass [GeV]
+  WAp:  0.01352  # dark photon width [GeV]
+  gV_0: 0.038    # coupling to electron
+  gV_1: 0.038
+  gV_2: 0.038
+  gV_3: 0.038
+  gV_4: 0.038
+  gV_5: 0.038
+  gV_6: 0.038
+  gV_7: 0.038   # muon coupling
+  gV_8: 0.038   # tau coupling
+
+# Optional: uncomment to run a grid scan
+# parameter_scan:
+#   MAp: [10.0, 20.0, 30.0, 50.0, 75.0, 100.0]
+#   gV_0: [0.01, 0.038, 0.1]
+
+generation:
+  n_events:   5000
+  nb_core:    64
+  energy_gev: 13000.
+  mmll_min:   4.0
+  mmll_max:   120.0
+  seed:       42
+  use_gridpack: false    # set true for repeated runs at varied params (faster)
+
+shower:
+  backend: pythia8       # 'pythia8' (works now) or 'fpcd' (when trained)
+  mlm_matching: false    # set true for MLM-matched samples
+
+detector:
+  enabled: true
+  backend: delphes       # 'delphes' (works now) or 'ml' (when trained)
+  # detector_card: /path/to/custom_card.tcl   # optional, defaults to ATLAS card
+
+output:
+  dir:       /pscratch/sd/l/lcondren/MCsim/bsm_pipeline_output
+  work_dir:  /pscratch/sd/l/lcondren/MCsim/bsm_pipeline_work
+  save_lhe:   true
+  save_hepmc: false    # HepMC files are large; set true if you need them
+  save_numpy: true     # always save z_lhe.npy, z_truth.npy

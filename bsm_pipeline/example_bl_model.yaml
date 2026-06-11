@@ -1,0 +1,37 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# BSM Pipeline config: B-L scalar model (arbitrary UFO example)
+# Run: python run_pipeline.py --config example_bl_model.yaml
+# ──────────────────────────────────────────────────────────────────────────────
+
+model:
+  name: BL_scalar
+  ufo_path: /path/to/BL_scalar_UFO    # ← replace with actual UFO path
+  process: "p p > zp > mu+ mu-"
+
+parameters:
+  MZp:      30.0    # Z' mass [GeV]
+  WZp:      0.005   # Z' width [GeV]
+  gBL:      0.1     # B-L gauge coupling
+  MHP:      200.0   # scalar mass [GeV]
+  alphaBL:  0.01
+
+generation:
+  n_events:   5000
+  nb_core:    64
+  energy_gev: 13000.
+  mmll_min:   4.0
+  mmll_max:   120.0
+  seed:       42
+  use_gridpack: false
+
+shower:
+  backend: pythia8
+
+detector:
+  enabled: false    # skip Delphes, just get LHE + showered kinematics
+
+output:
+  dir:      /pscratch/sd/l/lcondren/MCsim/bl_pipeline_output
+  work_dir: /pscratch/sd/l/lcondren/MCsim/bl_pipeline_work
+  save_lhe:   true
+  save_numpy: true
