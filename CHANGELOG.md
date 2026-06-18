@@ -6,6 +6,74 @@ Each entry records SHA-256 hashes so changes can be verified or reverted.
 
 ---
 
+## [2026-06-18] — E008 holdout plots: parton-cone bug fix
+
+### Summary
+Fixed a parton-direction bug in `plot_e008_bsm_holdout.py` that caused all parton-cone truth histograms to be empty. The bug: `eta_p` was set to `float(parton_feat[slot, 0])`, but feature[0] in E008 parton data is `log_E ≈ 7–8`, not η. This placed all partons outside detector acceptance so no truth particles fell within ΔR < 0.4 of any parton. Fix: derive η from `pz/p = feature[3]` via `η = 0.5·ln((1+pz/p)/(1−pz/p))`, matching the original `plot_infer_wprime_holdout.py` approach.
+
+### `omnilearn_pp/scripts/plot_e008_bsm_holdout.py` — bug fix
+- `_jet_fl`: replaced `eta_p = float(pf_ev[slot, 0])` with `pz_e = clip(pf_ev[slot, 3]); eta_p = 0.5·log((1+pz_e)/(1−pz_e))`.
+- `_parton_cone_measure`: same fix.
+- Corrected stale comment on parton feature format (was `[η,sinφ,cosφ,logpT,…]`; correct is `[log_E,sinφ,cosφ,pz/p,…]`).
+- **To revert:** restore `eta_p = float(parton_feat_arr[i, slot, 0])` in both functions.
+
+---
+
+## [2026-06-15] — E015: Parnassus full-event detector wrapper
+
+### Summary
+Built `parnassus_wrapper.py` to chain BSM diffusion output (infer_bsm_grid.py NPZ) through the full-event Parnassus detector surrogate and save HDF5. Smoke-tested on 100 events; no NaN/Inf, mean multiplicity preserved, pT mean 17.6→8.8 GeV (detector response applied). Runs in `pipeline_copy-gpu2` conda env. See EXPERIMENTS.md §E015 for full design notes.
+
+### `omnilearn_pp/scripts/parnassus_wrapper.py` — new file
+- Imports `FullEventFlowLightning` directly from `train_full_event_detector.py` (same `pipeline_copy-gpu2` env; no subprocess needed).
+- Preprocessing replicates `FullEventDataset.__init__` exactly: `log(pT_GeV × 1000)` z-score per event for pT, η, φ.
+- pflow mask = truth mask (1:1 particle mapping; valid because infer_bsm_grid.py output is a contiguous prefix mask).
+- Output HDF5: `reco_particles (N,600,3)`, `reco_mask (N,600)`, `hadron_particles (N,500,3)`, `hadron_mask (N,500)`, attrs `{m_X, m_Y, event_count}`.
+- Output path: `/pscratch/sd/l/lcondren/MCsim/parnassus_output/{run_name}/{mX}_{mY}/recoparticles.hdf5`.
+- **To revert:** delete this file.
+
+---
+
+## [2026-06-14] — E008: BSM mass-grid diffusion (training, inference, plotting)
+
+### Summary
+Full W'→4q (X→YY→4q) BSM mass grid experiment: new mass-conditioned architecture, training on 141 signal+background files, 4-point 2×2 holdout, mid-training diagnostic inference (epochs ~19–24) on 4 held-out mass points, and holdout comparison plots. See EXPERIMENTS.md §E008 for full experimental protocol.
+
+### `omnilearn_pp/scripts/PET_pp_parton_vpar_bsm.py` — new file
+- Extends `PET_pp_parton_vpar.py` with two scalar mass-conditioning slots: `m_X/600` replaces parton slot 2 feature 2, `m_Y/600` replaces slot 3 feature 2. All other architecture identical to the vpar baseline.
+- Four-parton layout: slots 0/1 = beam partons (never conditioned on mass); slots 2/3 = X and Y boson mass tokens.
+- **To revert:** delete this file; revert any training scripts pointing at it.
+
+### `omnilearn_pp/scripts/bsm_grid_train.py` — new file
+- Training script for BSM mass-grid model. Loads `bsm_*.h5` files from grid dir (140 signal mass points + 1 QCD background). Weighted loss (`|w|`-weighted). Supports `--n_train` cap for OOM mitigation.
+- Uses `PET_pp_parton_vpar_bsm` architecture, `--num_gen_layers 2` for memory efficiency.
+- **To revert:** delete this file.
+
+### `omnilearn_pp/scripts/infer_bsm_grid.py` — new file
+- Inference script for BSM mass-grid model. Accepts `--m_X`, `--m_Y` to construct mass conditioning. Outputs `bsm_mX{mX}_mY{mY}.npz` with `parts_truth`, `parts_gen`, `mask`, `mask_gen`, `parton_feat`, `mass_x`, `mass_y`.
+- Output particles are fully denormalized (physical units) before saving.
+- **To revert:** delete this file.
+
+### `omnilearn_pp/scripts/plot_e008_bsm_holdout.py` — new file
+- Plots for E008 holdout inference: 5 plot types (particle dists, global obs, jet obs, jet images, parton cone), 4 mass points treated as separate processes. Adapted from `plot_infer_wprime_holdout.py` for E008 parton feature format (7-feature with mass/600 in slot 6; log_E in slot 0, pz/p in slot 3).
+- **To revert:** delete this file.
+
+### Submit scripts — new files in `omnilearn_pp/submit/`
+- `submit_e008_bsm_grid.sh` — self-resubmitting training job (4h/job, 1 GPU, account m2616).
+- `submit_e008_holdout_infer.sh` — final 10k-event holdout inference (post-convergence; 4 mass points × 5k).
+- `submit_e008_holdout_infer_ep019.sh` — mid-training diagnostic, first 2 mass points (timed out at 4h).
+- `submit_e008_holdout_infer_ep019_remaining.sh` — mid-training diagnostic, remaining 2 mass points.
+
+### `omnilearn_pp/scripts/plot_infer_wprime_holdout.py` — new file (precursor)
+- Precursor plot script for wprimeGrid NPZ format. Loads `mX*.npz` files. Same 5 plot types. Used for earlier W'→jj holdout runs before E008.
+- **To revert:** delete this file.
+
+### Submit scripts (wprimeGrid)
+- `submit_wprimeGrid_1node.sh` — W'→jj grid training job (precursor to E008).
+- `submit_infer_wprime_holdout.sh` — W'→jj holdout inference job.
+
+---
+
 ## [2026-06-11] — E007: Auxiliary classification on body output (auxcls_body experiment)
 
 ### Summary
