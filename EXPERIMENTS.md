@@ -2,7 +2,7 @@
 
 Source of truth for what's running, what's done, and what each result means.
 
-Last updated: 2026-06-15 (E015 complete — Parnassus wrapper built and smoke-tested)
+Last updated: 2026-06-25 (E022 submitted — Slurm job 55094220; num_gen_layers=4 variant of E020c)
 
 ---
 
@@ -10,8 +10,17 @@ Last updated: 2026-06-15 (E015 complete — Parnassus wrapper built and smoke-te
 
 | ID | Status | Submitted | Type | Run name | Slurm job | Notes |
 |----|--------|-----------|------|----------|-----------|-------|
-| E008 | RUNNING | 2026-06-14 | training | `bsm_grid` | 54455691 | Resuming from epoch 4 (val_loss=4.943); 4 epochs completed interactively after second OOM fix (--n_train 20000 + staggered del); prior jobs 54415946/54440955/54442541 OOM-killed |
+| E008 | RUNNING | 2026-06-14 | training | `bsm_grid` | 54707121 | Epoch 55/200, val_loss=4.900; continuation job (prior jobs: 54455691 and chain) |
+| A007 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_holdout_ep055_5k` | 54716471 | Mid-training holdout inference at epoch ~55; 4 holdout pts (250,250)(250,300)(300,250)(300,300), 5k events, 500 steps; submit: `submit_e008_holdout_infer_ep055.sh` |
+| A008 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_trained_ep019_5k` | 54677288 | Trained-point inference for mass-overlay comparison; 4 trained pts (200,200)(200,350)(350,200)(350,350), used with `plot_e008_mass_overlay.py` to confirm model fans out with mass |
 | E016 | PLANNED | — | validation | `parnassus_validation` | — | Test Parnassus output on W'→4q signal; compare to dijet training-domain behavior |
+| E020a | RUNNING | 2026-06-19 | training | `bsm_grid_event_a` | 54738498 | Event-level MET conditioning (3 feat); epoch 49/200 val_loss=4.899; self-resubmitting |
+| E020b | RUNNING | 2026-06-19 | training | `bsm_grid_event_b` | 54738499 | Event-level cone_X conditioning (2 feat); epoch 51/200 val_loss=4.899; self-resubmitting |
+| E020c | RUNNING | 2026-06-19 | training | `bsm_grid_event_c` | 54738501 | Event-level all-7 event features; epoch 56/200 val_loss=4.896; self-resubmitting |
+| E022  | RUNNING | 2026-06-25 | training | `bsm_grid_event_c_layers4` | 55094220 | E020c + num_gen_layers=4; self-resubmitting; submit: `submit_e022_bsm_grid_event.sh` |
+| A009a-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_a/infer_holdout_truth` | 55037853 | E020a truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
+| A009b-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_b/infer_holdout_truth` | 55037857 | E020b truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
+| A009c-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_c/infer_holdout_truth` | 55037860 | E020c truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
 
 ---
 
@@ -113,6 +122,39 @@ Last updated: 2026-06-15 (E015 complete — Parnassus wrapper built and smoke-te
   - PDG norm in X/Y parton slots (2/3) is 0 for all signal events due to a generation bug (gluon PDG encoded instead of ±24/23). Mass feature alone differentiates signal from background; gluon PDG mismatch is non-blocking for Phase 2 proof-of-concept.
   - SM data (pdg_norm /16) is incompatible with wprime_signal data (pdg_norm /10). Do NOT mix datasets without recomputing stats.
 - **Next step:** When training completes, submit `omnilearn_pp/submit_e008_holdout_infer.sh` — runs all 4 holdout points at 500 steps/event, 10k events each, outputs 4 separate .npz files (one per mass point) so plotting code can treat each as a distinct process. Inference default is 500 steps.
+
+---
+
+### A008 — E008 trained-point inference (mass-overlay comparison)
+
+- **Date submitted:** 2026-06-19
+- **Slurm job:** 54677288
+- **Goal:** Generate events at 4 mass points that were **in the training set** — (200,200), (200,350), (350,200), (350,350) — to pair with the 4 holdout points in `plot_e008_mass_overlay.py`. Together they answer: does the model produce visually distinct kinematic distributions for different mass hypotheses (confirming mass conditioning is active), or does it output the same distribution regardless of input mass?
+- **Setup:**
+  - Checkpoint: `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid/pet_pp.weights.h5` (epoch ~55 at submission)
+  - 4 trained mass points; event count and step count per the submit script
+  - Output: `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid/infer_trained_ep019_5k/`
+  - Analysis script: `omnilearn_pp/scripts/plot_e008_mass_overlay.py` — overlays HT, MET, leading pT, top-4 pT across all 8 mass points; computes W1 vs mSum scatter
+- **Status:** RUNNING — job 54677288 submitted 2026-06-19, currently PENDING.
+- **Linked experiments:** A007 (holdout inference, complementary input to mass-overlay plot), E008 (training source).
+
+---
+
+### A007 — E008 epoch-55 holdout inference diagnostic
+
+- **Date submitted:** 2026-06-19
+- **Slurm job:** 54716471
+- **Goal:** Evaluate holdout generation quality at epoch 55 (val_loss=4.900) vs the earlier epoch-19 diagnostic (A-series, ~val_loss=4.904). Training is still ongoing (55/200 epochs, job 54707121). This is a mid-training snapshot to check whether the cone-mass and global-observable distributions have improved.
+- **Setup:**
+  - Checkpoint: `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid/pet_pp.weights.h5` (epoch 55)
+  - Holdout points: (250,250), (250,300), (300,250), (300,300)
+  - 5k events each, 500 steps, anti-kT R=0.4 jet clustering
+  - Output: `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid/infer_holdout_ep055_5k/`
+  - Plot script: `omnilearn_pp/scripts/plot_e008_bsm_holdout.py` → output to `plots_ep055/`
+  - Submit script: `omnilearn_pp/submit_e008_holdout_infer_ep055.sh`
+- **Motivation:** Cone-mass and parton-cone distributions looked poor at epoch ~19. The val_loss drop from 4.904 → 4.900 is small but training is still in early descent; checking whether multi-particle correlations (jet mass, cone mass) improve with more training.
+- **Status:** RUNNING — job 54716471 submitted 2026-06-19.
+- **Linked experiments:** E008 (training source), prior ep019 diagnostic (A-series).
 
 ---
 
@@ -369,6 +411,87 @@ Last updated: 2026-06-15 (E015 complete — Parnassus wrapper built and smoke-te
 
 ## Planned experiments (not yet submitted)
 
+### E022 — bsm_grid_event_c_layers4
+
+- **Date staged:** 2026-06-25
+- **Slurm job:** 55094220; self-resubmitting
+- **Goal:** Test whether increasing num_gen_layers from 2 to 4 in the E020c architecture improves event-level observable agreement.
+- **Hypothesis:** More cross-attention layers in the generator head give particles more rounds of attention to the event token, allowing stronger use of the all-7 event conditioning. E020c showed residual error in conditioned observables that may be capacity-limited at num_gen_layers=2.
+- **Architecture:** Identical to E020c (PET_pp_parton_vpar_bsm_event_c) except num_gen_layers=4. Event token carries all 7 features (MET×3 + cone_X×2 + cone_Y×2). All other hyperparameters unchanged: num_layers=8, proj_dim=128, batch=128, lr=3e-4, lr_body=1e-4.
+- **Scripts:**
+  - Architecture: `PET_pp_parton_vpar_bsm_event_c_layers4.py`
+  - Training: `bsm_grid_train_event_c_layers4.py`
+  - Inference: `infer_bsm_grid_event_c_layers4.py`
+  - Submit: `submit_e022_bsm_grid_event.sh`
+- **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid_event_c_layers4/`
+- **Smoke test:** PASS (2026-06-25) — 2 epochs, val_loss 4.64→3.76, num_gen_layers=4 confirmed, inference output written.
+- **Diff from E020c:** exactly 1 line in arch (default), 3 lines in train (import, run_name, default), 3 lines in infer (import, run_name, default), 1 line in submit script (num_gen_layers arg).
+- **Status:** RUNNING — Slurm job 55094220.
+- **Comparison:** Run holdout inference with `infer_bsm_grid_event_c_layers4.py` after training; compare to E020c holdout inference using same observables.
+
+---
+
+### A009a/b/c — E020 mid-training holdout inference (oracle/truth-conditioned)
+
+- **Date submitted:** 2026-06-25
+- **Slurm jobs:** A009a: 55037853, A009b: 55037857, A009c: 55037860
+- **Goal:** Early diagnostic of E020a/b/c at epoch ~49–51/200 (oracle/truth-conditioned only).
+  Event features computed from HDF5 truth particles and passed directly to the model — upper bound on what event conditioning can achieve.
+- **Setup:** 4 holdout points (250,250),(250,300),(300,250),(300,300); 5k events each; 4 GPUs in parallel (one holdout point per GPU, all 4 in same job). 500 steps.
+- **Scripts:** `infer_bsm_grid_event_{a,b,c}.py` via `submit_e020{a,b,c}_holdout_infer_truth.sh`
+- **Output dirs:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid_event_{a,b,c}/infer_holdout_truth/`
+- **Status:** RUNNING — 3 jobs submitted 2026-06-25.
+
+---
+
+### E021 — Event conditioning comparison plots and Wasserstein analysis
+
+- **Date staged:** 2026-06-19
+- **Goal:** Quantify whether E020a/b/c event-level token conditioning improves generation of event-level observables vs the baseline (E010). Produces per-(mass-point, observable) overlay plots and a Wasserstein distance summary table.
+- **Depends on:** E008 baseline holdout inference + E020a/b/c training + A009a/b/c oracle holdout inference complete.
+- **Script:** `omnilearn_pp/scripts/compare_event_conditioning.py`
+- **Observables:** MET magnitude, MET φ, cone_pT_X, cone_mass_X, cone_pT_Y, cone_mass_Y (primary); marginal η, log_pT (sanity check).
+- **Outputs:**
+  - `figures/E020_event_conditioning_comparison/<obs>_<mass_point>.pdf` — 1 PDF per (mass_point × observable) overlay; 4 curves (baseline, E020a, b, c) + truth reference.
+  - `figures/E020_event_conditioning_comparison/wasserstein_table.csv` — W1(generated, truth) per (observable, mass_point, variant).
+- **Status:** PLANNED — waiting for E020a/b/c to train and produce holdout inference outputs.
+- **How to run:**
+  ```
+  python3 compare_event_conditioning.py \
+      --baseline_dir  .../bsm_grid/infer_holdout_5k \
+      --e020a_dir     .../bsm_grid_event_a/infer_holdout \
+      --e020b_dir     .../bsm_grid_event_b/infer_holdout \
+      --e020c_dir     .../bsm_grid_event_c/infer_holdout
+  ```
+
+---
+
+### E020a/b/c — Event-level conditioning diagnostics (stage-2 isolation)
+
+- **Date staged:** 2026-06-19
+- **Goal:** Test whether adding a learned event-level token to the cross-attention KV set in the generator head improves generation quality for stage 2 of the BSM grid pipeline. Three parallel variants differing only in which event features are used.
+- **Motivation:** The current model conditions each particle on hard-scatter parton kinematics but has no access to global event-level observables (MET, cone mass) that correlate with final-state topology. Adding an event token tests whether this information helps the diffusion score function.
+- **Architecture change (all variants):** A new `inp_event` input is processed through two Dense layers → reshaped to `(N,1,D)` → concatenated with the 4 parton embeddings to form `cond_set = (N,5,D)` for cross-attention. Attention mask extended to `(N,1,5)`. The `inp_jet` global conditioning path (log_npart) is unchanged. Background events receive all-zero event features. Stats computed from signal files only; sin/cos features normalized with mean=0, std=1 (no-op z-score).
+- **Variants:**
+
+  | ID | Features | `num_event_feat` | `_SINCOS_INDICES` | Arch | Train | Infer |
+  |----|----------|-----------------|-------------------|------|-------|-------|
+  | E020a | log1p(MET_mag), sin(MET_phi), cos(MET_phi) | 3 | [1,2] | `PET_pp_parton_vpar_bsm_event_a.py` | `bsm_grid_train_event_a.py` | `infer_bsm_grid_event_a.py` |
+  | E020b | log1p(cone_pT_X), log1p(cone_mass_X) | 2 | [] | `PET_pp_parton_vpar_bsm_event_b.py` | `bsm_grid_train_event_b.py` | `infer_bsm_grid_event_b.py` |
+  | E020c | All 7: MET (3) + cone_X (2) + cone_Y (2) | 7 | [1,2] | `PET_pp_parton_vpar_bsm_event_c.py` | `bsm_grid_train_event_c.py` | `infer_bsm_grid_event_c.py` |
+
+- **Event feature computation:** R_CONE=1.0; cone features use parton slots 2 (X) and 3 (Y) as cone axes; dR < 1.0 particle selection; massless 4-vector sum for invariant mass. All log1p-transformed scalar features normalized with signal-only z-score; sin/cos features left at mean=0 std=1.
+- **Stats files:** `normalisation_stats_event_a/b/c.json` at `/pscratch/sd/l/lcondren/MCsim/wprime_signal/` — auto-computed by training script on first run if absent.
+- **Inference:** Reads truth event features from HDF5 particle data, normalizes, passes as `event_feat` positional arg to `model.generate()`. This is a stage-2 isolation test: truth event features are used (not predicted by a stage-1 model).
+- **Smoke test results (2026-06-19):** All three variants passed end-to-end (train 1 epoch → inference 50 events). val_loss (1-epoch, untrained): a=16.14, b=14.47, c=18.85. Expected overflow warnings in npart rounding from untrained model; safely clipped.
+- **Pre-training sanity checks (2026-06-19):** All passed. Cone observables: cone_mass_X=196.7 GeV (expected ~100–350 for m_X=200), cone_mass_Y=295.1 GeV (expected ~150–400 for m_Y=300), MET=4.45 GeV. Stats files show no NaN/zero-std anomalies. Model forward pass (4, 20, 6) output, no NaN/Inf.
+- **Status:** RUNNING — submitted 2026-06-19. Slurm: E020a=54738498, E020b=54738499, E020c=54738501. All self-resubmitting.
+- **Submit scripts:** `submit_e020a/b/c_bsm_grid_event.sh`
+- **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/{bsm_grid_event_a,b,c}/`
+- **Linked experiments:** E008 (baseline model without event conditioning); compare holdout W1 at equal epochs.
+
+---
+
 ### Phase 1 (SM multi-process)
 
 - **E003 (complete 2026-06-11):** See detail section above.
@@ -379,8 +502,13 @@ Last updated: 2026-06-15 (E015 complete — Parnassus wrapper built and smoke-te
 
 | ID | Status | Type | Run name | Notes |
 |----|--------|------|----------|-------|
-| E008 | RUNNING | training | `bsm_grid` | Slurm job 54455691; submitted 2026-06-14 |
+| E008 | RUNNING | training | `bsm_grid` | Slurm job 54707121; epoch 55/200, val_loss=4.900 |
+| A007 | RUNNING | diagnostic (inference) | `bsm_grid → infer_holdout_ep055_5k` | Slurm job 54716471; 4 holdout pts, 5k events, 500 steps; plots → `plots_ep055/` |
+| A008 | RUNNING | diagnostic (inference) | `bsm_grid → infer_trained_ep019_5k` | Slurm job 54677288; 4 trained pts (200,200)(200,350)(350,200)(350,350); input for mass-overlay plot |
 | E016 | PLANNED | validation | `parnassus_validation` | Run parnassus_wrapper.py on E008 holdout inference output; compare reco distributions (multiplicity, pT, η) vs QCD training domain; critical check for OOD behavior |
+| E020a | RUNNING | training | `bsm_grid_event_a` | Slurm 54738498; MET conditioning (3 feat); self-resubmitting |
+| E020b | RUNNING | training | `bsm_grid_event_b` | Slurm 54738499; cone_X conditioning (2 feat); self-resubmitting |
+| E020c | RUNNING | training | `bsm_grid_event_c` | Slurm 54738501; all-7 event features; self-resubmitting |
 
 ---
 
