@@ -12,8 +12,33 @@ Copied from bsm_grid_train_event_c.py (E020c) and modified for E023:
 Do NOT modify the original bsm_grid_train_event_c.py (E020c canonical).
 """
 
-import horovod.tensorflow.keras as hvd
-hvd.init()
+try:
+    import horovod.tensorflow.keras as hvd
+    hvd.init()
+except (ImportError, ModuleNotFoundError, Exception):
+    import types as _types
+    _BGVC = type('BroadcastGlobalVariablesCallback', (), {
+        '__init__': lambda self, *a, **kw: None,
+        'set_params': lambda self, p: None,
+        'set_model': lambda self, m: None,
+        'on_train_begin': lambda self, logs=None: None,
+        'on_epoch_begin': lambda self, ep, logs=None: None,
+        'on_batch_begin': lambda self, b, logs=None: None,
+        'on_batch_end': lambda self, b, logs=None: None,
+        'on_epoch_end': lambda self, ep, logs=None: None,
+        'on_train_end': lambda self, logs=None: None,
+    })
+    hvd = _types.SimpleNamespace(
+        rank=lambda: 0,
+        local_rank=lambda: 0,
+        size=lambda: 1,
+        allreduce=lambda x, **kw: x,
+        broadcast=lambda x, **kw: x,
+        DistributedOptimizer=lambda opt, **kw: opt,
+        callbacks=_types.SimpleNamespace(
+            BroadcastGlobalVariablesCallback=_BGVC,
+        ),
+    )
 
 import os, sys, argparse, pickle, json, glob, time as _time, gc
 import numpy as np
