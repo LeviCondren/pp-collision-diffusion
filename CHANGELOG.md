@@ -6,6 +6,42 @@ Each entry records SHA-256 hashes so changes can be verified or reverted.
 
 ---
 
+## [2026-06-30] — E023: 8-dim stage-1 diffusion (bsm_grid_event_c_stage1)
+
+### Summary
+Expanded stage-1 ResNet from 1-dim (log_npart only) to 8-dim — jointly predicting log_npart plus all 7 event-level scalars (MET, cone_pT/mass for X and Y partons) as a v-parameterized diffusion model. The stage-2 particle generator (model_part) is architecturally unchanged and still receives 1-dim log_npart for its global conditioning path during training; truth event features are passed through the cross-attention event token. At inference, generated event features from stage-1 can be used for stage-2 conditioning (`--use_true_event False`), enabling a fully generative two-stage pipeline. ResNet width increased to mlp_dim=512 (from 256) to match FPCD default. Smoke test passed; training submitted as Slurm job 55325644.
+
+### `omnilearn_pp/scripts/PET_pp_parton_vpar_bsm_event_c_stage1.py` — new file (copied from E020c arch)
+- SHA-256: `d9d1d2bd1be63fd88276e13fbd5687eae4ea123e793253607455c3a0db9e0341`
+- Class renamed `PET_pp_parton_vpar_bsm_event_c_stage1`; `WeightedBSMPET_event_c` subclass updated to inherit from it.
+- `__init__`: added `num_jet_mlp=512` parameter; split shared `inputs_jet` into `inputs_jet_s2 = Input((1,))` (for model_part) and `inputs_jet_s1 = Input((num_jet,))` (for model_jet). Stage-1 ResNet called with `mlp_dim=num_jet_mlp`.
+- `train_step` / `test_step`: model_part receives `x['input_jet'][:, 0:1]` (log_npart only). Stage-1 model_jet receives full 8-dim `x['input_jet']`.
+- `WeightedBSMPET_event_c.train_step` / `test_step`: fixed `tf.squeeze(…, axis=1)` → `tf.reduce_mean(…, axis=1)` for weighted jet loss (required for 8-dim output; squeeze is undefined on non-singleton dims).
+- `generate()`: added `num_jet_steps` and `use_true_event` params. Stage-1 now samples (N,8); col 0 used for mask construction and stage-2 head; cols 1-7 used as stage-2 event conditioning if `use_true_event=False`. Returns `(parts, jets)` where `jets` is (N, num_jet=8).
+
+### `omnilearn_pp/scripts/bsm_grid_train_event_c_stage1.py` — new file (copied from E020c training script)
+- SHA-256: `b1ac7d426cd8787edba9500c4c9c474eab8e4a6361fb0ebbbee587c9f5a6b550`
+- `NUM_JET = 8`; `jet_all` shape (N, 8) = concatenation of normalized log_npart (col 0) and normalized 7-dim event features (cols 1-7).
+- Replaced separate `compute_stats` + `compute_event_stats` pattern with single `compute_combined_stats_stage1()` that outputs one self-contained JSON with 8-dim `jet_mean`/`jet_std`.
+- Stats file: `normalisation_stats_event_c_stage1.json` (auto-computed on first run).
+- `load_stats()` validates `len(jet_mean) == NUM_JET`. `load_bsm_shard()` extracts scalar log_npart stats (index 0) and 7-dim event stats (indices 1-7) from the combined array.
+- `event_all` (N,7) truth event features for stage-2 are still stored separately and passed as `input_event` to model_part.
+- Added `--num_jet_mlp` CLI arg (default 512); removed `--stats_event_path`.
+
+### `omnilearn_pp/scripts/infer_bsm_grid_event_c_stage1.py` — new file (copied from E020c inference script)
+- SHA-256: `180ee4c726d8a6cafce487ae1dd13a1bfade2c409bb1ba7e3e75ab778f3fc3ea`
+- Imports `PET_pp_parton_vpar_bsm_event_c_stage1`; `num_jet=8`.
+- Loads combined stats from `normalisation_stats_event_c_stage1.json`; no separate event stats file.
+- Added `--use_true_event`, `--num_jet_steps`, `--num_jet_mlp` flags.
+- Output NPZ adds `jets_gen` (N,8) and renames `event_feat` → `event_feat_truth`.
+
+### `omnilearn_pp/submit_e023_bsm_grid_event_stage1.sh` — new submit script
+- SHA-256: `c79f6bd76e795eab140c9d60e817167a3cf532d297624dddc6cf2237aa4a1c1d`
+- Same hyperparameters as E020c (lr=3e-4, epoch=200, batch=128); adds `--num_jet_mlp 512`.
+- Self-resubmitting; Slurm job 55325644.
+
+---
+
 ## [2026-06-18] — E008 holdout plots: parton-cone bug fix
 
 ### Summary

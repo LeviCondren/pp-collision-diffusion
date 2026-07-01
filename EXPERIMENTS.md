@@ -2,7 +2,7 @@
 
 Source of truth for what's running, what's done, and what each result means.
 
-Last updated: 2026-06-25 (E022 submitted — Slurm job 55094220; num_gen_layers=4 variant of E020c)
+Last updated: 2026-06-30 (E023 submitted — Slurm job 55325644; 8-dim stage-1 diffusion)
 
 ---
 
@@ -18,6 +18,7 @@ Last updated: 2026-06-25 (E022 submitted — Slurm job 55094220; num_gen_layers=
 | E020b | RUNNING | 2026-06-19 | training | `bsm_grid_event_b` | 54738499 | Event-level cone_X conditioning (2 feat); epoch 51/200 val_loss=4.899; self-resubmitting |
 | E020c | RUNNING | 2026-06-19 | training | `bsm_grid_event_c` | 54738501 | Event-level all-7 event features; epoch 56/200 val_loss=4.896; self-resubmitting |
 | E022  | RUNNING | 2026-06-25 | training | `bsm_grid_event_c_layers4` | 55094220 | E020c + num_gen_layers=4; self-resubmitting; submit: `submit_e022_bsm_grid_event.sh` |
+| E023  | RUNNING | 2026-06-30 | training | `bsm_grid_event_c_stage1` | 55355425 | Expand stage-1 ResNet from 1-dim to 8-dim (log_npart + 7 event features); mlp_dim=512; self-resubmitting; submit: `submit_e023_bsm_grid_event_stage1.sh` |
 | A009a-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_a/infer_holdout_truth` | 55037853 | E020a truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
 | A009b-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_b/infer_holdout_truth` | 55037857 | E020b truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
 | A009c-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_c/infer_holdout_truth` | 55037860 | E020c truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
@@ -54,6 +55,28 @@ Last updated: 2026-06-25 (E022 submitted — Slurm job 55094220; num_gen_layers=
 ## Experiment details
 
 (Most recent first.)
+
+---
+
+### E023 — Stage-1 8-dim diffusion (bsm_grid_event_c_stage1)
+
+- **Date staged:** 2026-06-30
+- **Goal:** Train stage-1 as a v-parameterized diffusion model that jointly predicts all 8 event-level scalars — [log_npart, log1p(MET), sin(MET_phi), cos(MET_phi), log1p(cone_pT_X), log1p(cone_mass_X), log1p(cone_pT_Y), log1p(cone_mass_Y)] — from parton conditioning alone. Replaces the E020c stage-1 which predicts only log_npart. This completes the full two-stage pipeline: stage 1 generates all event-level scalars; stage 2 conditions on log_npart (for mask) and the 7 event features (for cross-attention) when generating particle clouds.
+- **Architecture changes vs E020c:**
+  - `PET_pp_parton_vpar_bsm_event_c_stage1.py`: `num_jet=8`; separate `inputs_jet_s2=Input((1,))` for model_part and `inputs_jet_s1=Input((8,))` for model_jet; ResNet `mlp_dim=512` (up from 256); v-parameterization unchanged; `WeightedBSMPET_event_c.train_step` fixed — `tf.squeeze` replaced by `tf.reduce_mean` for 8-dim weighted jet loss.
+  - Stage-2 (model_part) is structurally identical to E020c: receives 1-dim log_npart + 7-dim truth event features during training.
+  - `generate()` gains `use_true_event` and `num_jet_steps` params; returns `(parts, jets)` where `jets` is (N,8).
+- **Stats:** `normalisation_stats_event_c_stage1.json` — single self-contained file with 8-dim `jet_mean/std` (combining log_npart and event feature stats). Computed automatically on first training run.
+- **Scripts:**
+  - Architecture: `omnilearn_pp/scripts/PET_pp_parton_vpar_bsm_event_c_stage1.py`
+  - Training: `omnilearn_pp/scripts/bsm_grid_train_event_c_stage1.py`
+  - Inference: `omnilearn_pp/scripts/infer_bsm_grid_event_c_stage1.py`
+- **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid_event_c_stage1/`
+- **Hyperparameters:** Same as E020c — lr=3e-4, lr_body=1e-4, epoch=200, batch=128, proj_dim=128, num_layers=8, num_gen_layers=2, patience=30.
+- **Holdout:** Same 4 points as E020c — (250,250), (250,300), (300,250), (300,300).
+- **Status:** RUNNING — Slurm job 55355425 (resubmit), submitted 2026-07-01. First run (55325644) cancelled after 1 epoch because smoke test contaminated production stats file: smoke test wrote normalisation_stats_event_c_stage1.json to the production grid_dir with only 100 events / 50 particle slots, causing jet_std[0]=1e-5 (zero-variance floor) and val_loss≈1e9. Fix: (1) stats default path moved to ckpt_dir; (2) bad stats + checkpoint cleared. Now recomputing stats from full dataset. Self-resubmitting.
+- **Open question:** Does generating event features (MET, cone pT/mass) as part of stage-1 diffusion improve their accuracy vs truth-conditioning (E020c)? To test: compare A-series inference with `--use_true_event` vs default (generated) on the same checkpoint.
+- **Linked experiments:** E020c (source; truth-conditioned event features); E022 (wider generator head variant of E020c).
 
 ---
 
