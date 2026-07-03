@@ -73,6 +73,9 @@ export PYTHONPATH="${REPO_DIR}/scripts:${PYTHONPATH:-}"
 # below with:
 #   horovodrun -np NGPU python3 -u $SCRIPT ...   (and set --ntasks/--gpus above)
 # Otherwise single-GPU:
+# NOTE: if GPU has < 24 GB VRAM, reduce batch to 64 AND halve the LRs to maintain
+# the same effective LR-per-example as the reference NERSC run (batch=128, lr=3e-4):
+#   --batch 64 --lr 1.5e-4 --lr_body 5e-5
 python3 -u "$SCRIPT" \
     --grid_dir           "${GRID_DIR}" \
     --ckpt_dir           "${CKPT_DIR}" \

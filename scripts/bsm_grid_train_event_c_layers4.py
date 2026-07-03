@@ -418,17 +418,19 @@ def load_bsm_shard(grid_dir, stats, event_stats, hvd_rank, hvd_size,
 
 def build_tf_dataset(pf, mask, cond, jet, weights, event_feat,
                      batch_size, repeat=False):
-    tf_x = tf.data.Dataset.from_tensor_slices({
-        'input_features': pf,
-        'input_points':   pf[:, :, :2],
-        'input_mask':     mask,
-        'input_jet':      jet,
-        'input_weight':   weights,
-        'input_event':    event_feat,
-    })
-    tf_y = tf.data.Dataset.from_tensor_slices(cond)
+    # Pin dataset construction to CPU so tensors live in RAM, not VRAM.
+    # .cache() is omitted: the numpy arrays are already in RAM, caching adds overhead.
+    with tf.device('/CPU:0'):
+        tf_x = tf.data.Dataset.from_tensor_slices({
+            'input_features': pf,
+            'input_points':   pf[:, :, :2],
+            'input_mask':     mask,
+            'input_jet':      jet,
+            'input_weight':   weights,
+            'input_event':    event_feat,
+        })
+        tf_y = tf.data.Dataset.from_tensor_slices(cond)
     ds   = (tf.data.Dataset.zip((tf_x, tf_y))
-            .cache()
             .shuffle(batch_size * 100)
             .batch(batch_size))
     if repeat:
