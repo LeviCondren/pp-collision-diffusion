@@ -2,7 +2,7 @@
 
 Source of truth for what's running, what's done, and what each result means.
 
-Last updated: 2026-06-30 (E023 submitted — Slurm job 55325644; 8-dim stage-1 diffusion)
+Last updated: 2026-07-06 (E027 submitted — SM 4-process training job 55618161)
 
 ---
 
@@ -10,6 +10,7 @@ Last updated: 2026-06-30 (E023 submitted — Slurm job 55325644; 8-dim stage-1 d
 
 | ID | Status | Submitted | Type | Run name | Slurm job | Notes |
 |----|--------|-----------|------|----------|-----------|-------|
+| E027 | RUNNING | 2026-07-06 | training | `sm_4proc_event_c_layers4` | 55618161 | SM 4-process (dijet, ttbar, wjets, zjets); E022 arch (event_c, num_gen_layers=4); train [0:480k], val [480k:490k]; self-resubmitting |
 | E008 | RUNNING | 2026-06-14 | training | `bsm_grid` | 54707121 | Epoch 55/200, val_loss=4.900; continuation job (prior jobs: 54455691 and chain) |
 | A007 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_holdout_ep055_5k` | 54716471 | Mid-training holdout inference at epoch ~55; 4 holdout pts (250,250)(250,300)(300,250)(300,300), 5k events, 500 steps; submit: `submit_e008_holdout_infer_ep055.sh` |
 | A008 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_trained_ep019_5k` | 54677288 | Trained-point inference for mass-overlay comparison; 4 trained pts (200,200)(200,350)(350,200)(350,350), used with `plot_e008_mass_overlay.py` to confirm model fans out with mass |
@@ -17,8 +18,11 @@ Last updated: 2026-06-30 (E023 submitted — Slurm job 55325644; 8-dim stage-1 d
 | E020a | RUNNING | 2026-06-19 | training | `bsm_grid_event_a` | 54738498 | Event-level MET conditioning (3 feat); epoch 49/200 val_loss=4.899; self-resubmitting |
 | E020b | RUNNING | 2026-06-19 | training | `bsm_grid_event_b` | 54738499 | Event-level cone_X conditioning (2 feat); epoch 51/200 val_loss=4.899; self-resubmitting |
 | E020c | RUNNING | 2026-06-19 | training | `bsm_grid_event_c` | 54738501 | Event-level all-7 event features; epoch 56/200 val_loss=4.896; self-resubmitting |
-| E022  | RUNNING | 2026-06-25 | training | `bsm_grid_event_c_layers4` | 55094220 | E020c + num_gen_layers=4; self-resubmitting; submit: `submit_e022_bsm_grid_event.sh` |
-| E023  | RUNNING | 2026-06-30 | training | `bsm_grid_event_c_stage1` | 55355425 | Expand stage-1 ResNet from 1-dim to 8-dim (log_npart + 7 event features); mlp_dim=512; self-resubmitting; submit: `submit_e023_bsm_grid_event_stage1.sh` |
+| E022  | CANCELLED | 2026-07-06 | training | `bsm_grid_event_c_layers4` | 55094220→55617495 | Cancelled (job 55617495) to start E027 SM training |
+| E023  | CANCELLED | 2026-07-06 | training | `bsm_grid_event_c_stage1` | 55355425→55602074 | Cancelled (jobs 55602074+55616460) to start E027 SM training |
+| A010-t | RUNNING | 2026-07-05 | inference (holdout, truth-cond) | `bsm_grid_event_c_layers4/infer_holdout_truth` | 55529568 | E022 truth-conditioned holdout; 4 pts × 5k events × 500 steps |
+| A011-t | RUNNING | 2026-07-05 | inference (holdout, truth-cond) | `bsm_grid_event_c_stage1/infer_holdout_truth` | 55529570 | E023 truth-conditioned holdout (--use_true_event); directly comparable to A009c-t |
+| A011-p | RUNNING | 2026-07-05 | inference (holdout, generated) | `bsm_grid_event_c_stage1/infer_holdout_pred` | 55529572 | E023 full generated pipeline; stage-1 generates event features from partons |
 | A009a-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_a/infer_holdout_truth` | 55037853 | E020a truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
 | A009b-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_b/infer_holdout_truth` | 55037857 | E020b truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
 | A009c-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_c/infer_holdout_truth` | 55037860 | E020c truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
@@ -39,6 +43,8 @@ Last updated: 2026-06-30 (E023 submitted — Slurm job 55325644; 8-dim stage-1 d
 
 | ID | Completed | Type | Run name | Key result | Notes |
 |----|-----------|------|----------|------------|-------|
+| E026 | 2026-07-06 | data generation | `wprime_signal_grid` | 144 × 100k events complete at `/pscratch/sd/l/lcondren/MCsim/wprime_signal/`; Pythia8-only | MG5 attempt abandoned (SM EW constraint); `generate_wprime_signal.py` fixed (N_PARTONS=4, --task-id added) |
+| E024 | 2026-07-06 | post-processing diagnostic | `met_postprocessing_diagnostic` | MET W₁ improved 22× (0.033→0.0015); logpT degraded 3.6× | Uniform correction; detailed results in detail section |
 | E015 | 2026-06-15 | infrastructure | `parnassus_integration_setup` | Wrapper built at `omnilearn_pp/scripts/parnassus_wrapper.py`; smoke test 100 events passed; mean mult 190→190, pT 17.6→8.8 GeV, no NaN/Inf | Full-event model (fm_full_event-epoch=034); run in pipeline_copy-gpu2 env |
 | E007 | 2026-06-13 | training (CANCELLED) | `auxcls_body_5proc` | 19/200 epochs; val_loss=5.447 at cancellation | Cancelled to run partial-ckpt inference (A006); body auxcls loss was decreasing normally |
 | E001 | 2026-06-13 | training (CANCELLED) | `cfg_5proc_dropout10` | 61/200 epochs; val_loss=5.421 at cancellation | Cancelled to run partial-ckpt inference (A005); CFG training proceeding normally |
@@ -55,6 +61,77 @@ Last updated: 2026-06-30 (E023 submitted — Slurm job 55325644; 8-dim stage-1 d
 ## Experiment details
 
 (Most recent first.)
+
+---
+
+### E027 — SM 4-process training with E022 architecture (sm_4proc_event_c_layers4)
+
+- **Date submitted:** 2026-07-06
+- **Type:** Training
+- **Goal:** Train the E022 architecture (PET_pp_parton_vpar_bsm_event_c_layers4, num_gen_layers=4) on the 4 standard SM processes (dijet, ttbar, wjets, zjets) from `full_event_mixed/` instead of the W' signal grid. This tests whether the event-level conditioning (MET + cone_X + cone_Y) generalises to SM processes and establishes a SM-only baseline for comparing generated vs truth distributions.
+- **Architecture:** Identical to E022: `PET_pp_parton_vpar_bsm_event_c_layers4`, num_layers=8, num_gen_layers=4, proj_dim=128, event_c (all-7 event features)
+- **Data:** `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/` — dijet, ttbar, wjets, zjets (500k events each). Train [0:480k], validation [480k:490k], holdout [490k:500k].
+- **Key difference from BSM training:** All events have mass_x=mass_y=0 (no mass grid conditioning). Event features always computed from truth particle data (no zeroing-out for "background").
+- **Training script:** `omnilearn_pp/scripts/sm_4proc_train_event_c_layers4.py`
+- **Submit script:** `omnilearn_pp/submit_e027_sm_4proc_train.sh` (self-resubmitting, 4h × N jobs)
+- **Checkpoint:** `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/checkpoints_sm_4proc/sm_4proc_event_c_layers4/pet_pp.weights.h5`
+- **Stats files:** `full_event_mixed/normalisation_stats_sm4proc.json`, `normalisation_stats_event_c_sm4proc.json` (computed fresh from SM training data on first run)
+- **Slurm job:** 55618161 (self-resubmitting chain)
+- **Inference:** `omnilearn_pp/submit_e027_sm_4proc_infer.sh` — 4 processes × 5k events = 20k total holdout; truth-conditioned event features; 500 diffusion steps
+- **Status:** RUNNING (job 55618161)
+
+---
+
+### E026 — W' grid data generation (wprime_signal_grid)
+
+- **Date completed:** 2026-07-06
+- **Type:** Data generation (no training)
+- **Goal:** Generate W' → WZ → 4q signal data on the 144-point mass grid in SM-compatible full_event_fpcd format for joint SM+W' training.
+- **Outcome:** Data already existed at `/pscratch/sd/l/lcondren/MCsim/wprime_signal/` from prior runs of `generate_wprime_signal.py` (Pythia8-only). All 144 files × 100k events confirmed complete.
+- **MG5 attempt (ABANDONED):** `generate_wprime_mg5_v2.py` was created to add LHE-matched partons but failed with SM EW constraint: MW is a dependent parameter computed from MZ via `cmath.sqrt(MZ²/2 + sqrt(MZ⁴/4 - aEW·π·MZ²/(GF·√2)))`. For MZ=50 GeV the inner sqrt goes negative → complex MW. No param_card hack can override this because MG5 recomputes dependent parameters from the model's Python code regardless of param_card content. The `wprime_wv1v2` custom UFO model in `fpcd_full_event/wprime_wv1v2/` (which has all masses external/independent) is incomplete — missing `particles.py`, `vertices.py`, `couplings.py`, `lorentz.py`.
+- **Script fix:** `generate_wprime_signal.py` corrected — `N_PARTONS` was erroneously 6 (would produce `(N, 6, 6)` data incompatible with training code that hardcodes 4 slots); fixed to 4. Added `--task-id` argument for clean SLURM array deployment.
+- **SLURM script:** `fpcd_full_event/submit_wprime_grid.sh` — 144-task array calling `generate_wprime_signal.py --task-id`
+- **Data location:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/signal_mX{XXXX}_mY{YYYY}.hdf5` (144 files × 100k events)
+- **Format:** `particle_features` (N, 500, 7), `parton_features` (N, 4, 6), `event_weights` (N,); attrs: mass_x, mass_y, process, wprime_mass
+- **Parton slots:** 0=beam+(incoming, pz>0), 1=beam-(incoming, pz<0), 2=W(±24, mX), 3=Z(23, mY); phi=0 for incoming
+- **Grid:** mX, mY ∈ {50,100,...,600} GeV → 144 points; task_id → mX = 50+(task_id//12)×50, mY = 50+(task_id%12)×50
+- **Status:** COMPLETED. Existing Pythia8-only data verified complete. Script fixed and SLURM template updated.
+
+---
+
+### E024 — MET post-processing diagnostic (met_postprocessing_diagnostic)
+
+- **Date completed:** 2026-07-06
+- **Type:** Post-processing diagnostic — no training, no model changes
+- **Goal:** Test whether a simple MET correction — sample target MET magnitude from truth distribution, distribute correction uniformly across valid particles — achieves the intended effect (MET matches truth) without meaningfully degrading other observables. If successful, applicable in the PAWS integration pipeline.
+- **Setup:** Applied to E020c generated outputs at 4 held-out points (250,250),(250,300),(300,250),(300,300), 5000 events each. Truth MET distributions computed from full 100k-event signal HDF5 files. MET_phi sampled uniformly (confirmed perfectly uniform in truth: std = π/√3).
+- **Scripts:**
+  - `omnilearn_pp/scripts/compute_truth_met.py` — extracts truth MET from HDF5 files
+  - `omnilearn_pp/scripts/postprocess_met.py` — applies per-event correction
+  - `omnilearn_pp/scripts/plot_met_postprocessing.py` — diagnostic plots + Wasserstein table
+- **Input:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid_event_c/infer_holdout_truth/`
+- **Output (post-processed NPZs):** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/checkpoints_bsm_grid/bsm_grid_event_c/infer_holdout_truth_metpp/`
+- **Truth MET files:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/truth_met/`
+- **Figures:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/figures/E024_met_postprocessing/`
+
+**Results (mean rel-W₁ over 4 mass points):**
+
+| Observable | Before | After | Change |
+|---|---|---|---|
+| MET_magnitude | 0.0333 | 0.0015 | **−0.0318 (22× improvement)** |
+| MET_phi | 0.0047 | 0.0071 | +0.0024 (slight degradation) |
+| cone_pT_X | 0.0025 | 0.0019 | −0.0005 (marginal improvement) |
+| cone_pT_Y | 0.0019 | 0.0021 | +0.0002 (negligible) |
+| cone_mass_X | 0.0162 | 0.0153 | −0.0008 (marginal improvement) |
+| cone_mass_Y | 0.0165 | 0.0156 | −0.0009 (marginal improvement) |
+| multiplicity | 0.0189 | 0.0189 | **0.000 (unchanged)** |
+| eta_particle | 0.0010 | 0.0010 | 0.000 (unchanged) |
+| logpT_particle | 0.0019 | 0.0069 | **+0.0050 (3.6× degradation)** |
+| phi_particle | 0.0012 | 0.0014 | +0.0002 (negligible) |
+
+**Interpretation:** MET post-processing works exactly as designed — the correction lands precisely on the sampled target (After = Target verified numerically). The 22× improvement in MET rel-W₁ comes at the cost of a 3.6× degradation in per-particle log_pT (0.0019→0.0069). The mechanism is correct: redistributing MET correction uniformly across ~150–200 particles means each particle receives ~0.1–0.3 GeV of momentum shift in x and y; for soft particles (pT ~0.5–1 GeV) this meaningfully perturbs the pT magnitude. The absolute value of the log_pT degradation (0.005) is still small, and cone observables are essentially unaffected. No unphysical particles (zero clamp events). MET_phi is slightly worse because we decorrelate phi from the particles; this is negligible (0.007 absolute).
+
+**Recommendation:** Safe to apply in the PAWS pipeline for producing physically realistic MET, provided the use case tolerates a ~4× worsening in per-particle pT distribution quality. If per-particle pT fidelity is critical, an alternative is to apply the correction weighted by pT (so hard particles absorb more of the momentum shift, leaving soft particles undisturbed). That is E025.
 
 ---
 
