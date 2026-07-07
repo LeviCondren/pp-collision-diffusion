@@ -2,10 +2,10 @@
 #SBATCH --account=daniel_lab
 #SBATCH --partition=gpu          # or free-gpu for lower priority
 #SBATCH --nodes=1
-#SBATCH --ntasks=4
-#SBATCH --ntasks-per-node=4
-#SBATCH --gpus=4                 # adjust if HPC3 has fewer than 4 GPUs per node
-#SBATCH --mem=200G
+#SBATCH --ntasks=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus=1
+#SBATCH --mem=64G
 #SBATCH --time=04:00:00
 #SBATCH --job-name=e027_sm_4proc
 #SBATCH --output=/pub/lcondren/MCsim/full_event_mixed/logs/%j_e027_sm_4proc.out
@@ -24,7 +24,7 @@
 #   4. Update SM_DIR to wherever the compact HDF5 files were rsync'd.
 
 # ── HPC3 paths ────────────────────────────────────────────────────────────────
-SCRIPT=/data/homezvol0/lcondren/pp-collision-diffusion/scripts/sm_4proc_train_event_c_layers4.py
+SCRIPT=/data/homezvol0/lcondren/pp-collision-diffusion/scripts/sm_4proc_train_singlegpu.py
 SM_DIR=/pub/lcondren/MCsim/full_event_mixed       # <-- update if different
 RUN_NAME=sm_4proc_event_c_layers4
 CKPT_DIR=${SM_DIR}/checkpoints_sm_4proc
@@ -64,7 +64,7 @@ echo "Next job scheduled: ${NEXT_JOB} (depends on ${SLURM_JOB_ID})"
 # ── Run training ──────────────────────────────────────────────────────────────
 export PYTHONPATH=/data/homezvol0/lcondren/pp-collision-diffusion/scripts
 
-srun python3 -u $SCRIPT \
+python3 -u $SCRIPT \
     --sm_dir             ${SM_DIR} \
     --ckpt_dir           ${CKPT_DIR} \
     --run_name           ${RUN_NAME} \
