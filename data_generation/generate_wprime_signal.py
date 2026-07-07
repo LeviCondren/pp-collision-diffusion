@@ -55,7 +55,7 @@ import pythia8
 
 N_PART_MAX    = 500
 N_PART_FEAT   = 7     # [η, sin_φ, cos_φ, log_pT, pid_cat, charge, occupancy]
-N_PARTONS     = 6     # 2 incoming + up to 3 final colored + 1 hard boson slot
+N_PARTONS     = 4     # 2 incoming + W(X) + Z(Y); hardcoded 4 to match training code
 N_PARTON_FEAT = 6     # [log_E, sin_φ, cos_φ, pz/E, pdg_norm(÷16), occupancy]
 PT_MIN        = 0.3   # GeV
 ETA_MAX       = 5.0
@@ -433,18 +433,36 @@ def generate_events(process: str, mass_x: float, mass_y: float,
 def main():
     p = argparse.ArgumentParser(
         description="Generate W' signal or QCD background in pipeline HDF5 format.")
-    p.add_argument("--process",  required=True, choices=["signal", "background"],
+    p.add_argument("--process",  default="signal", choices=["signal", "background"],
                    help="'signal': W'→WZ→4j  |  'background': QCD dijet")
-    p.add_argument("--mass-x",   type=float, default=500.,
-                   help="mX (W mass) in GeV  [signal only]")
-    p.add_argument("--mass-y",   type=float, default=100.,
-                   help="mY (Z mass) in GeV  [signal only]")
+    p.add_argument("--mass-x",   type=float, default=None,
+                   help="mX (W mass) in GeV  [signal only; overridden by --task-id]")
+    p.add_argument("--mass-y",   type=float, default=None,
+                   help="mY (Z mass) in GeV  [signal only; overridden by --task-id]")
+    p.add_argument("--task-id",  type=int,   default=None,
+                   help="SLURM array task id 0-143; maps to mX=50+12*(id//12)*50, mY=50+(id%%12)*50")
     p.add_argument("--nevents",  type=int,   default=100_000)
-    p.add_argument("--seed",     type=int,   default=42)
+    p.add_argument("--seed",     type=int,   default=None,
+                   help="RNG seed (default: 1000 + task_id for grid tasks, 42 otherwise)")
     p.add_argument("--out",      type=Path,
                    default=Path("/pscratch/sd/l/lcondren/MCsim/wprime_signal"),
                    help="Output directory")
     args = p.parse_args()
+
+    if args.task_id is not None:
+        # Grid task: mX = 50, 100, ..., 600  (12 rows);  mY = 50, 100, ..., 600  (12 cols)
+        args.process = "signal"
+        args.mass_x  = 50.0 + (args.task_id // 12) * 50.0
+        args.mass_y  = 50.0 + (args.task_id  % 12) * 50.0
+        if args.seed is None:
+            args.seed = 1000 + args.task_id
+    else:
+        if args.mass_x is None:
+            args.mass_x = 500.0
+        if args.mass_y is None:
+            args.mass_y = 100.0
+        if args.seed is None:
+            args.seed = 42
 
     if args.process == "signal":
         fname = f"signal_mX{int(args.mass_x):04d}_mY{int(args.mass_y):04d}.hdf5"
