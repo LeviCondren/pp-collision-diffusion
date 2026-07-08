@@ -2,7 +2,7 @@
 
 Source of truth for what's running, what's done, and what each result means.
 
-Last updated: 2026-07-06 (E027 submitted — SM 4-process training job 55618161)
+Last updated: 2026-07-07 (E029 submitted — SM 4-process full-data training, job 55662074)
 
 ---
 
@@ -10,7 +10,8 @@ Last updated: 2026-07-06 (E027 submitted — SM 4-process training job 55618161)
 
 | ID | Status | Submitted | Type | Run name | Slurm job | Notes |
 |----|--------|-----------|------|----------|-----------|-------|
-| E027 | RUNNING | 2026-07-06 | training | `sm_4proc_event_c_layers4` | 55618161 | SM 4-process (dijet, ttbar, wjets, zjets); E022 arch (event_c, num_gen_layers=4); train [0:480k], val [480k:490k]; self-resubmitting |
+| E029 | RUNNING | 2026-07-07 | training | `sm_4proc_event_c_layers4_full` | 55662074 | SM 4-process full-data training; same arch as E027 but no --n_train limit → 480k events/rank → 3750 steps/epoch; holdout [490k:500k], inference 5k/process |
+| E028 | RUNNING | 2026-07-07 | data generation | `wprime_signal_mpi` | 55661111 | W' 144-pt grid regen with MPI on; output → `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/`; 144-task array; 2h/task |
 | E008 | RUNNING | 2026-06-14 | training | `bsm_grid` | 54707121 | Epoch 55/200, val_loss=4.900; continuation job (prior jobs: 54455691 and chain) |
 | A007 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_holdout_ep055_5k` | 54716471 | Mid-training holdout inference at epoch ~55; 4 holdout pts (250,250)(250,300)(300,250)(300,300), 5k events, 500 steps; submit: `submit_e008_holdout_infer_ep055.sh` |
 | A008 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_trained_ep019_5k` | 54677288 | Trained-point inference for mass-overlay comparison; 4 trained pts (200,200)(200,350)(350,200)(350,350), used with `plot_e008_mass_overlay.py` to confirm model fans out with mass |
@@ -43,6 +44,7 @@ Last updated: 2026-07-06 (E027 submitted — SM 4-process training job 55618161)
 
 | ID | Completed | Type | Run name | Key result | Notes |
 |----|-----------|------|----------|------------|-------|
+| E027 | 2026-07-07 | training | `sm_4proc_event_c_layers4` | val_loss=5.530 at epoch 200; **undertrained** — used only n_train=20k/process (4% of data) → 156 steps/epoch | 3 jobs: 55618161, 55619116, 55623267; superseded by E029 (full-data retrain) |
 | E026 | 2026-07-06 | data generation | `wprime_signal_grid` | 144 × 100k events complete at `/pscratch/sd/l/lcondren/MCsim/wprime_signal/`; Pythia8-only | MG5 attempt abandoned (SM EW constraint); `generate_wprime_signal.py` fixed (N_PARTONS=4, --task-id added) |
 | E024 | 2026-07-06 | post-processing diagnostic | `met_postprocessing_diagnostic` | MET W₁ improved 22× (0.033→0.0015); logpT degraded 3.6× | Uniform correction; detailed results in detail section |
 | E015 | 2026-06-15 | infrastructure | `parnassus_integration_setup` | Wrapper built at `omnilearn_pp/scripts/parnassus_wrapper.py`; smoke test 100 events passed; mean mult 190→190, pT 17.6→8.8 GeV, no NaN/Inf | Full-event model (fm_full_event-epoch=034); run in pipeline_copy-gpu2 env |
@@ -61,6 +63,41 @@ Last updated: 2026-07-06 (E027 submitted — SM 4-process training job 55618161)
 ## Experiment details
 
 (Most recent first.)
+
+---
+
+### E029 — SM 4-process full-data training (sm_4proc_event_c_layers4_full)
+
+- **Date staged:** 2026-07-07
+- **Type:** Training
+- **Goal:** Retrain E027 on the full SM training split. E027 erroneously used `--n_train 20000`, limiting each rank to only 20k events (4% of available data) and giving 156 steps/epoch — the model trained in ~5 hours across 200 epochs but was severely data-starved (val_loss plateaued at 5.530). E029 removes the n_train cap so each rank loads all 480k events across all 4 process files, giving 3750 steps/epoch.
+- **Architecture:** Identical to E027 and E022: `PET_pp_parton_vpar_bsm_event_c_layers4`, num_layers=8, num_gen_layers=4, proj_dim=128, event_c (all-7 event features).
+- **Data:** Same as E027 — `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/` (dijet, ttbar, wjets, zjets, 500k events each). Train [0:480k], validation [480k:490k], holdout [490k:500k].
+- **Step count:** 480k events/rank ÷ batch 128 = 3750 steps/epoch (vs 156 in E027). Estimated ~1.15h/epoch → ~3 epochs per 4h job → ~70 jobs to reach 200 epochs.
+- **Scripts:**
+  - Training: `omnilearn_pp/scripts/sm_4proc_train_event_c_layers4.py`
+  - Submit: `omnilearn_pp/submit_e029_sm_4proc_train.sh` (self-resubmitting)
+  - Inference: `omnilearn_pp/submit_e029_sm_4proc_infer.sh` (4 processes × 5k events × 500 DDPM steps)
+- **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/checkpoints_sm_4proc/sm_4proc_event_c_layers4_full/`
+- **Difference from E027:** One change — `--n_train 20000` removed. Everything else identical (arch, data, hypers).
+- **Slurm job:** 55662074 (self-resubmitting chain)
+- **Status:** RUNNING
+
+---
+
+### E028 — W' signal grid regeneration with MPI on (wprime_signal_mpi)
+
+- **Date submitted:** 2026-07-07
+- **Type:** Data generation
+- **Goal:** Regenerate the full 144-point W' → WZ → 4q mass grid with `PartonLevel:MPI = on`, matching the SM data generation settings. The original E026 data (at `/pscratch/sd/l/lcondren/MCsim/wprime_signal/`) was generated with MPI off, causing the MET distribution to be sharply peaked at zero — unphysical relative to the SM processes, where MPI contributes a realistic spread of ~10–50 GeV to MET even in hadronic events. Turning MPI on removes this inconsistency.
+- **Physics motivation:** The signal is fully hadronic (W/Z → qq̄ only; no neutrinos), so the true MET from hard-scatter neutrinos is genuinely zero. However, the underlying event (MPI) is a real physical contribution present in the SM data and at the LHC. Removing MPI created an artificial domain gap: signal MET ≈ 0 exactly, SM MET has a soft spread. With MPI on, both datasets have consistent underlying-event activity.
+- **Change from E026:** Single line in `generate_wprime_signal.py`: `PartonLevel:MPI = off → on` (applied to both signal and background initializers).
+- **Old data preserved:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/` (MPI off) is unchanged — required by active E008/E020a/b/c/E022/E023 experiments.
+- **New data location:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/`
+- **Script:** `fpcd_full_event/generate_wprime_signal.py` (MPI=on as of this commit)
+- **Submit script:** `fpcd_full_event/submit_wprime_grid_mpi.sh` — 144-task SLURM array, 2h/task (MPI adds ~30–40% generation cost)
+- **Slurm job:** 55661111 (array 0–143)
+- **Status:** RUNNING
 
 ---
 

@@ -278,7 +278,7 @@ def _init_pythia_signal(mass_x: float, mass_y: float, seed: int) -> pythia8.Pyth
     W' (PDG 34) decays exclusively to WZ via Wprime:coup2WZ coupling.
     Direct qq̄ coupling of W' is suppressed to ≈0.
 
-    MPI is off (following original LHCO generation).
+    MPI is ON (matches SM data generation; adds realistic underlying-event MET).
     ISR, FSR, and hadronization are ON.
     """
     py = pythia8.Pythia("", False)   # second arg suppresses banner
@@ -314,8 +314,8 @@ def _init_pythia_signal(mass_x: float, mass_y: float, seed: int) -> pythia8.Pyth
     py.readString("23:onIfany = -3 3")    # Z → s s̄
     py.readString("23:onIfany = -4 4")    # Z → c c̄
 
-    # MPI off (matching original LHCO generation), ISR/FSR/hadronization ON
-    py.readString("PartonLevel:MPI = off")
+    # MPI on: matches SM data generation and adds realistic underlying-event MET.
+    py.readString("PartonLevel:MPI = on")
 
     # Reproducibility
     py.readString("Random:setSeed = on")
@@ -330,7 +330,7 @@ def _init_pythia_background(seed: int) -> pythia8.Pythia:
     Configure Pythia8 for QCD dijet background in the W' kinematic region.
 
     pTHatMin = 1500 GeV efficiently populates the ~3.5 TeV dijet-mass region
-    relevant to the W' signal. MPI off to match signal generation.
+    relevant to the W' signal. MPI on to match signal generation.
     """
     py = pythia8.Pythia("", False)
     py.readString("Print:quiet = on")
@@ -345,8 +345,8 @@ def _init_pythia_background(seed: int) -> pythia8.Pythia:
     py.readString("HardQCD:nQuarkNew = 5")
     py.readString("PhaseSpace:pTHatMin = 1500.")
 
-    # MPI off (matching signal)
-    py.readString("PartonLevel:MPI = off")
+    # MPI on: matches signal generation settings.
+    py.readString("PartonLevel:MPI = on")
 
     # Reproducibility
     py.readString("Random:setSeed = on")
