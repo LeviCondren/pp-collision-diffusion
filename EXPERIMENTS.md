@@ -2,7 +2,7 @@
 
 Source of truth for what's running, what's done, and what each result means.
 
-Last updated: 2026-07-07 (E029 submitted — SM 4-process full-data training, job 55662074)
+Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job 55726504)
 
 ---
 
@@ -10,6 +10,7 @@ Last updated: 2026-07-07 (E029 submitted — SM 4-process full-data training, jo
 
 | ID | Status | Submitted | Type | Run name | Slurm job | Notes |
 |----|--------|-----------|------|----------|-----------|-------|
+| E030 | RUNNING | 2026-07-09 | training | `sm_5proc_event_c_stage1` | 55726504 | SM 5-process stage-1 diffusion; identical arch to E023 (num_jet=8, num_gen_layers=4, num_jet_mlp=512) but trained on full_event_mixed/ 5-proc SM data instead of W' BSM grid |
 | E029 | RUNNING | 2026-07-07 | training | `sm_4proc_event_c_layers4_full` | 55662074 | SM 4-process full-data training; same arch as E027 but no --n_train limit → 480k events/rank → 3750 steps/epoch; holdout [490k:500k], inference 5k/process |
 | E028 | RUNNING | 2026-07-07 | data generation | `wprime_signal_mpi` | 55661111 | W' 144-pt grid regen with MPI on; output → `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/`; 144-task array; 2h/task |
 | E008 | RUNNING | 2026-06-14 | training | `bsm_grid` | 54707121 | Epoch 55/200, val_loss=4.900; continuation job (prior jobs: 54455691 and chain) |
@@ -63,6 +64,26 @@ Last updated: 2026-07-07 (E029 submitted — SM 4-process full-data training, jo
 ## Experiment details
 
 (Most recent first.)
+
+---
+
+### E030 — SM 5-process stage-1 diffusion (sm_5proc_event_c_stage1)
+
+- **Date submitted:** 2026-07-09
+- **Type:** Training
+- **Goal:** Train the E023 stage-1 architecture on the 5 SM process files (dijet, ttbar, wjets, zjets, wprime) from `full_event_mixed/`. E023 trains the same model on the W' BSM mass grid; E030 is the SM analog. The stage-1 DDPM jointly predicts all 8 event-level scalars (log_npart + 7 event features) from parton conditioning, enabling a fully generative pipeline for SM processes without truth event feature injection at inference.
+- **Architecture:** Identical to E023 — `PET_pp_parton_vpar_bsm_event_c_stage1`, num_layers=8, num_gen_layers=4, proj_dim=128, num_jet_mlp=512, num_jet=8.
+- **Key difference from E023:** Data source is 5 SM process files (each 500k events) rather than 144 W' mass grid files. No mass conditioning (mass column always zero). No holdout points; all 5 processes contribute to the 8-dim jet target.
+- **Key difference from E029:** E029 trains stage-2 (particle generation) with truth event features injected. E030 trains both model_jet (stage-1, predicts 8-dim event vector) and model_part (stage-2, conditioned on that vector), enabling end-to-end generation without truth event features at inference.
+- **Data:** `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/` — dijet, ttbar, wjets, zjets, wprime (500k events each). Train [0:480k], val [480k:490k], holdout [490k:500k].
+- **Scripts:**
+  - Architecture: `omnilearn_pp/scripts/PET_pp_parton_vpar_bsm_event_c_stage1.py` (unchanged from E023)
+  - Training: `omnilearn_pp/scripts/sm_5proc_train_event_c_stage1.py`
+  - Submit: `omnilearn_pp/submit_e030_sm_5proc_stage1_train.sh` (self-resubmitting)
+- **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/checkpoints_sm_5proc/sm_5proc_event_c_stage1/`
+- **Stats file:** `checkpoints_sm_5proc/normalisation_stats_sm5proc_stage1.json` (8-dim combined jet stats; computed on first run)
+- **Slurm job:** 55726504 (self-resubmitting chain)
+- **Status:** RUNNING
 
 ---
 
