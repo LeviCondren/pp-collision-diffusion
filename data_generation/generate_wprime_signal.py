@@ -314,8 +314,9 @@ def _init_pythia_signal(mass_x: float, mass_y: float, seed: int) -> pythia8.Pyth
     py.readString("23:onIfany = -3 3")    # Z → s s̄
     py.readString("23:onIfany = -4 4")    # Z → c c̄
 
-    # MPI on: matches SM data generation and adds realistic underlying-event MET.
-    py.readString("PartonLevel:MPI = on")
+    # MPI off: Pythia8 hangs during MPI initialization for non-SM (W') processes.
+    # The MPI cross-section sampling loops indefinitely for BSM particles.
+    py.readString("PartonLevel:MPI = off")
 
     # Reproducibility
     py.readString("Random:setSeed = on")
@@ -330,7 +331,7 @@ def _init_pythia_background(seed: int) -> pythia8.Pythia:
     Configure Pythia8 for QCD dijet background in the W' kinematic region.
 
     pTHatMin = 1500 GeV efficiently populates the ~3.5 TeV dijet-mass region
-    relevant to the W' signal. MPI on to match signal generation.
+    relevant to the W' signal. MPI off to match signal generation.
     """
     py = pythia8.Pythia("", False)
     py.readString("Print:quiet = on")
@@ -345,8 +346,8 @@ def _init_pythia_background(seed: int) -> pythia8.Pythia:
     py.readString("HardQCD:nQuarkNew = 5")
     py.readString("PhaseSpace:pTHatMin = 1500.")
 
-    # MPI on: matches signal generation settings.
-    py.readString("PartonLevel:MPI = on")
+    # MPI off: matches signal generation settings.
+    py.readString("PartonLevel:MPI = off")
 
     # Reproducibility
     py.readString("Random:setSeed = on")

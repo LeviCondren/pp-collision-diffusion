@@ -12,7 +12,7 @@ Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job
 |----|--------|-----------|------|----------|-----------|-------|
 | E030 | RUNNING | 2026-07-09 | training | `sm_5proc_event_c_stage1` | 55726504 | SM 5-process stage-1 diffusion; identical arch to E023 (num_jet=8, num_gen_layers=4, num_jet_mlp=512) but trained on full_event_mixed/ 5-proc SM data instead of W' BSM grid |
 | E029 | RUNNING | 2026-07-07 | training | `sm_4proc_event_c_layers4_full` | 55662074 | SM 4-process full-data training; same arch as E027 but no --n_train limit → 480k events/rank → 3750 steps/epoch; holdout [490k:500k], inference 5k/process |
-| E028 | RUNNING | 2026-07-07 | data generation | `wprime_signal_mpi` | 55661111 | W' 144-pt grid regen with MPI on; output → `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/`; 144-task array; 2h/task |
+| E028 | FAILED | 2026-07-07 | data generation | `wprime_signal_mpi` | 55661111 | W' 144-pt grid regen with MPI on — FAILED: Pythia8 hangs during MPI init for non-SM W' process; 0 events generated in 2–4h; reverted to MPI=off |
 | E008 | RUNNING | 2026-06-14 | training | `bsm_grid` | 54707121 | Epoch 55/200, val_loss=4.900; continuation job (prior jobs: 54455691 and chain) |
 | A007 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_holdout_ep055_5k` | 54716471 | Mid-training holdout inference at epoch ~55; 4 holdout pts (250,250)(250,300)(300,250)(300,300), 5k events, 500 steps; submit: `submit_e008_holdout_infer_ep055.sh` |
 | A008 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_trained_ep019_5k` | 54677288 | Trained-point inference for mass-overlay comparison; 4 trained pts (200,200)(200,350)(350,200)(350,350), used with `plot_e008_mass_overlay.py` to confirm model fans out with mass |
@@ -118,7 +118,7 @@ Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job
 - **Script:** `fpcd_full_event/generate_wprime_signal.py` (MPI=on as of this commit)
 - **Submit script:** `fpcd_full_event/submit_wprime_grid_mpi.sh` — 144-task SLURM array, 2h/task (MPI adds ~30–40% generation cost)
 - **Slurm job:** 55661111 (array 0–143)
-- **Status:** RUNNING
+- **Status:** FAILED — Pythia8 hangs during MPI initialization for the non-SM W' process. Enabling `PartonLevel:MPI = on` causes Pythia8 to loop indefinitely during MPI cross-section setup because the MPI framework cannot sample cross-sections for BSM particles. Zero events were generated across all 144 tasks (confirmed: tasks ran for full 2–4h walltime and produced only the startup print line). Generator reverted to `MPI = off`. Existing MPI-off data at `/pscratch/sd/l/lcondren/MCsim/wprime_signal/` (E026) remains the canonical W' dataset. The MET domain gap between SM (MPI on) and W' (MPI off) is a known caveat.
 
 ---
 
