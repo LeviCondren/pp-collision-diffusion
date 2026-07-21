@@ -8,20 +8,21 @@
 #SBATCH --gpus=4
 #SBATCH --mem=128G
 #SBATCH --time=04:00:00
-#SBATCH --job-name=e029_sm_infer
-#SBATCH --output=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e029_sm_infer.out
-#SBATCH --error=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e029_sm_infer.err
+#SBATCH --job-name=a013t_e030_infer
+#SBATCH --output=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_a013t_e030_infer.out
+#SBATCH --error=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_a013t_e030_infer.err
 
-# E029 holdout inference — 4 SM processes in parallel (one per GPU).
-# Runs on holdout events [490000:495000] per process = 5k × 4 = 20k total.
-# Uses truth event features (stage-2 isolation test).
-# 500 DDPM steps.
+# A013-t — E030 holdout inference at final checkpoint (epoch 153).
+# Same config as A012-t but new output dir; checkpoint has more training.
+# Architecture: PET_pp_parton_vpar_bsm_event_c_stage1 (num_jet=8).
+# 4 SM processes in parallel on 4 GPUs, 5k events each, 500 DDPM steps.
+# Truth event features injected (use_truth_jet); wprime skipped (no holdout).
 
-SCRIPT=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts/sm_4proc_infer_event_c_layers4.py
+SCRIPT=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts/sm_5proc_infer_event_c_stage1.py
 SM_DIR=/pscratch/sd/l/lcondren/MCsim/full_event_mixed
-RUN_NAME=sm_4proc_event_c_layers4_full
-CKPT_DIR=${SM_DIR}/checkpoints_sm_4proc
-OUT_DIR=${CKPT_DIR}/${RUN_NAME}/infer_holdout_truth
+RUN_NAME=sm_5proc_event_c_stage1
+CKPT_DIR=${SM_DIR}/checkpoints_sm_5proc
+OUT_DIR=${CKPT_DIR}/${RUN_NAME}/infer_holdout_truth_ep153
 
 mkdir -p ${SM_DIR}/logs
 mkdir -p ${OUT_DIR}
@@ -44,6 +45,7 @@ COMMON_ARGS="
     --npart          500
     --num_layers     8
     --num_gen_layers 4
+    --num_jet_mlp    512
     --proj_dim       128
     --num_steps      500
     --use_truth_jet

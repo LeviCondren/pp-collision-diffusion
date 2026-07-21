@@ -8,19 +8,19 @@
 #SBATCH --gpus=4
 #SBATCH --mem=128G
 #SBATCH --time=04:00:00
-#SBATCH --job-name=e029_sm_infer
-#SBATCH --output=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e029_sm_infer.out
-#SBATCH --error=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e029_sm_infer.err
+#SBATCH --job-name=e030_sm5_infer
+#SBATCH --output=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e030_sm5_infer.out
+#SBATCH --error=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e030_sm5_infer.err
 
-# E029 holdout inference — 4 SM processes in parallel (one per GPU).
-# Runs on holdout events [490000:495000] per process = 5k × 4 = 20k total.
-# Uses truth event features (stage-2 isolation test).
-# 500 DDPM steps.
+# E030 holdout inference — 5 SM processes.
+# Architecture: PET_pp_parton_vpar_bsm_event_c_stage1 (num_jet=8).
+# Truth bypass: --use_truth_jet passes truth log_npart to particle DDPM.
+# Runs 4 processes in parallel on 4 GPUs; wprime runs sequentially after.
 
-SCRIPT=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts/sm_4proc_infer_event_c_layers4.py
+SCRIPT=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts/sm_5proc_infer_event_c_stage1.py
 SM_DIR=/pscratch/sd/l/lcondren/MCsim/full_event_mixed
-RUN_NAME=sm_4proc_event_c_layers4_full
-CKPT_DIR=${SM_DIR}/checkpoints_sm_4proc
+RUN_NAME=sm_5proc_event_c_stage1
+CKPT_DIR=${SM_DIR}/checkpoints_sm_5proc
 OUT_DIR=${CKPT_DIR}/${RUN_NAME}/infer_holdout_truth
 
 mkdir -p ${SM_DIR}/logs
@@ -44,6 +44,7 @@ COMMON_ARGS="
     --npart          500
     --num_layers     8
     --num_gen_layers 4
+    --num_jet_mlp    512
     --proj_dim       128
     --num_steps      500
     --use_truth_jet
@@ -55,6 +56,9 @@ python3 -u $SCRIPT $COMMON_ARGS --process ttbar  --gpu_id 1 &
 python3 -u $SCRIPT $COMMON_ARGS --process wjets  --gpu_id 2 &
 python3 -u $SCRIPT $COMMON_ARGS --process zjets  --gpu_id 3 &
 wait
+
+echo "=== Running wprime on GPU 0 ==="
+python3 -u $SCRIPT $COMMON_ARGS --process wprime --gpu_id 0
 
 echo "Job ${SLURM_JOB_ID} finished: $(date)"
 echo "Output files:"

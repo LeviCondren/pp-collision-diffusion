@@ -29,14 +29,14 @@ os.makedirs(OUT_DIR, exist_ok=True)
 N = args.n_events
 
 # ── Load all mass points ──────────────────────────────────────────────────────
-npz_files = sorted(glob.glob(os.path.join(args.infer_dir, 'mX*.npz')))
-assert npz_files, f'No mX*.npz files found in {args.infer_dir}'
+npz_files = sorted(glob.glob(os.path.join(args.infer_dir, '*.npz')))
+assert npz_files, f'No .npz files found in {args.infer_dir}'
 
 mass_points = {}
 for path in npz_files:
     d = np.load(path)
-    mX = float(d['mass_x'][0])
-    mY = float(d['mass_y'][0])
+    mX = float(np.atleast_1d(d['mass_x'])[0])
+    mY = float(np.atleast_1d(d['mass_y'])[0])
     key = f'mX{int(mX):04d}_mY{int(mY):04d}'
     label = rf"W' $m_{{X}}$={int(mX)} GeV, $m_{{Y}}$={int(mY)} GeV"
     mass_points[key] = {

@@ -10,33 +10,8 @@ Copied from bsm_grid_train.py and extended for E020a:
 Do NOT modify the original bsm_grid_train.py.
 """
 
-try:
-    import horovod.tensorflow.keras as hvd
-    hvd.init()
-except (ImportError, ModuleNotFoundError, Exception):
-    import types as _types
-    _BGVC = type('BroadcastGlobalVariablesCallback', (), {
-        '__init__': lambda self, *a, **kw: None,
-        'set_params': lambda self, p: None,
-        'set_model': lambda self, m: None,
-        'on_train_begin': lambda self, logs=None: None,
-        'on_epoch_begin': lambda self, ep, logs=None: None,
-        'on_batch_begin': lambda self, b, logs=None: None,
-        'on_batch_end': lambda self, b, logs=None: None,
-        'on_epoch_end': lambda self, ep, logs=None: None,
-        'on_train_end': lambda self, logs=None: None,
-    })
-    hvd = _types.SimpleNamespace(
-        rank=lambda: 0,
-        local_rank=lambda: 0,
-        size=lambda: 1,
-        allreduce=lambda x, **kw: x,
-        broadcast=lambda x, **kw: x,
-        DistributedOptimizer=lambda opt, **kw: opt,
-        callbacks=_types.SimpleNamespace(
-            BroadcastGlobalVariablesCallback=_BGVC,
-        ),
-    )
+import horovod.tensorflow.keras as hvd
+hvd.init()
 
 import os, sys, argparse, pickle, json, glob, time as _time, gc
 import numpy as np
@@ -418,19 +393,17 @@ def load_bsm_shard(grid_dir, stats, event_stats, hvd_rank, hvd_size,
 
 def build_tf_dataset(pf, mask, cond, jet, weights, event_feat,
                      batch_size, repeat=False):
-    # Pin dataset construction to CPU so tensors live in RAM, not VRAM.
-    # .cache() is omitted: the numpy arrays are already in RAM, caching adds overhead.
-    with tf.device('/CPU:0'):
-        tf_x = tf.data.Dataset.from_tensor_slices({
-            'input_features': pf,
-            'input_points':   pf[:, :, :2],
-            'input_mask':     mask,
-            'input_jet':      jet,
-            'input_weight':   weights,
-            'input_event':    event_feat,
-        })
-        tf_y = tf.data.Dataset.from_tensor_slices(cond)
+    tf_x = tf.data.Dataset.from_tensor_slices({
+        'input_features': pf,
+        'input_points':   pf[:, :, :2],
+        'input_mask':     mask,
+        'input_jet':      jet,
+        'input_weight':   weights,
+        'input_event':    event_feat,
+    })
+    tf_y = tf.data.Dataset.from_tensor_slices(cond)
     ds   = (tf.data.Dataset.zip((tf_x, tf_y))
+            .cache()
             .shuffle(batch_size * 100)
             .batch(batch_size))
     if repeat:

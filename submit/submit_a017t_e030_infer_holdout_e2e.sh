@@ -8,20 +8,21 @@
 #SBATCH --gpus=4
 #SBATCH --mem=128G
 #SBATCH --time=04:00:00
-#SBATCH --job-name=e029_sm_infer
-#SBATCH --output=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e029_sm_infer.out
-#SBATCH --error=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e029_sm_infer.err
+#SBATCH --job-name=a017t_e030_e2e
+#SBATCH --output=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_a017t_e030_e2e.out
+#SBATCH --error=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_a017t_e030_e2e.err
 
-# E029 holdout inference — 4 SM processes in parallel (one per GPU).
-# Runs on holdout events [490000:495000] per process = 5k × 4 = 20k total.
-# Uses truth event features (stage-2 isolation test).
-# 500 DDPM steps.
+# A017-t — E030 holdout inference at epoch 153, end-to-end (no use_truth_jet).
+# Stage-1 (jet model) runs first and its output conditions stage-2 (particle model).
+# Identical to A013-t except --use_truth_jet is removed.
+# Architecture: PET_pp_parton_vpar_bsm_event_c_stage1 (num_jet_mlp=512).
+# 4 SM processes in parallel (one per GPU), 5k events each, 500 DDPM steps.
 
-SCRIPT=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts/sm_4proc_infer_event_c_layers4.py
+SCRIPT=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts/sm_5proc_infer_event_c_stage1.py
 SM_DIR=/pscratch/sd/l/lcondren/MCsim/full_event_mixed
-RUN_NAME=sm_4proc_event_c_layers4_full
-CKPT_DIR=${SM_DIR}/checkpoints_sm_4proc
-OUT_DIR=${CKPT_DIR}/${RUN_NAME}/infer_holdout_truth
+RUN_NAME=sm_5proc_event_c_stage1
+CKPT_DIR=${SM_DIR}/checkpoints_sm_5proc
+OUT_DIR=${CKPT_DIR}/${RUN_NAME}/infer_holdout_e2e_10k_ep153
 
 mkdir -p ${SM_DIR}/logs
 mkdir -p ${OUT_DIR}
@@ -39,14 +40,15 @@ COMMON_ARGS="
     --ckpt_dir       ${CKPT_DIR}
     --run_name       ${RUN_NAME}
     --out_dir        ${OUT_DIR}
+    --stats_path     ${CKPT_DIR}/normalisation_stats_sm5proc_stage1.json
     --holdout_start  490000
-    --n_total        5000
+    --n_total        10000
     --npart          500
     --num_layers     8
     --num_gen_layers 4
+    --num_jet_mlp    512
     --proj_dim       128
     --num_steps      500
-    --use_truth_jet
 "
 
 echo "=== Launching 4 SM processes in parallel ==="

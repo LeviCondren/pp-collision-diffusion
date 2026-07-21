@@ -54,6 +54,8 @@ def _parse():
     p.add_argument('--num_jet_steps',   type=int, default=None,
                    help='DDPM steps for stage-1 sampler (default: 512)')
     p.add_argument('--num_jet_mlp',     type=int, default=512)
+    p.add_argument('--stage1_only',     action='store_true', default=False,
+                   help='Run only stage-1 (event feature generation); skip particle generation')
     return p.parse_args()
 
 
@@ -301,38 +303,61 @@ print(f'[rank {args.rank}] generating {N} events  nsplit={nsplit} '
 jets_in = jet_truth if args.use_truth_jet else None
 
 t1 = time.perf_counter()
-parts_gen, jets_gen = model.generate(
-    cond=cond,
-    jet_mean=jet_mean,
-    jet_std=jet_std,
-    event_feat=event_feat,
-    nsplit=nsplit,
-    num_steps=args.num_steps,
-    jets=jets_in,
-    use_tqdm=True,
-    num_jet_steps=args.num_jet_steps,
-    use_true_event=args.use_true_event,
-)
-dt = time.perf_counter() - t1
-print(f'[rank {args.rank}] generated in {dt/60:.2f} min  ({dt/N*1000:.0f} ms/event)')
 
-# jets_gen: (N, 8) — col 0 = normalized log_npart, cols 1-7 = event features
-log_npart_gen = jets_gen[:, 0] * jet_std + jet_mean
-npart_gen     = np.clip(np.round(np.exp(log_npart_gen)).astype(int), 1, args.npart)
-mask_gen      = (np.arange(args.npart)[None, :] < npart_gen[:, None]).astype(np.float32)
-parts_phys    = (parts_gen * part_std + part_mean) * mask_gen[:, :, None]
-parts_phys[:, :, 5] = np.round(parts_phys[:, :, 5])
+if args.stage1_only:
+    # Run only model_jet (stage-1); skip particle generation.
+    from tqdm import tqdm as _tqdm
+    jsteps   = args.num_jet_steps or 512
+    splits   = np.array_split(cond, nsplit)
+    jet_info = []
+    for split in _tqdm(splits, desc=f'[rank {args.rank}] stage-1'):
+        jet = model.DDPMSampler(split, model.ema_jet,
+                                data_shape=[split.shape[0], 8],
+                                w=0.0, num_steps=jsteps,
+                                const_shape=[-1, 1]).numpy()
+        jet_info.append(jet)
+    jets_gen = np.concatenate(jet_info)
+    dt = time.perf_counter() - t1
+    print(f'[rank {args.rank}] stage-1 done in {dt/60:.2f} min')
+    np.savez_compressed(out_file,
+        parton_feat      = part7,
+        mass_x           = np.float32(file_mx),
+        mass_y           = np.float32(file_my),
+        event_feat_truth = event_feat,
+        jets_gen         = jets_gen,   # (N, 8): col0=log_npart, cols1-7=event
+    )
+else:
+    parts_gen, jets_gen = model.generate(
+        cond=cond,
+        jet_mean=jet_mean,
+        jet_std=jet_std,
+        event_feat=event_feat,
+        nsplit=nsplit,
+        num_steps=args.num_steps,
+        jets=jets_in,
+        use_tqdm=True,
+        num_jet_steps=args.num_jet_steps,
+        use_true_event=args.use_true_event,
+    )
+    dt = time.perf_counter() - t1
+    print(f'[rank {args.rank}] generated in {dt/60:.2f} min  ({dt/N*1000:.0f} ms/event)')
 
-np.savez_compressed(out_file,
-    parts_truth       = X_raw,
-    parts_gen         = parts_phys,
-    mask              = mask_truth,
-    mask_gen          = mask_gen,
-    parton_feat       = part7,
-    mass_x            = np.float32(file_mx),
-    mass_y            = np.float32(file_my),
-    event_feat_truth  = event_feat,
-    jets_gen          = jets_gen,   # (N, 8): col0=log_npart, cols1-7=event
-)
+    log_npart_gen = jets_gen[:, 0] * jet_std + jet_mean
+    npart_gen     = np.clip(np.round(np.exp(log_npart_gen)).astype(int), 1, args.npart)
+    mask_gen      = (np.arange(args.npart)[None, :] < npart_gen[:, None]).astype(np.float32)
+    parts_phys    = (parts_gen * part_std + part_mean) * mask_gen[:, :, None]
+    parts_phys[:, :, 5] = np.round(parts_phys[:, :, 5])
+
+    np.savez_compressed(out_file,
+        parts_truth       = X_raw,
+        parts_gen         = parts_phys,
+        mask              = mask_truth,
+        mask_gen          = mask_gen,
+        parton_feat       = part7,
+        mass_x            = np.float32(file_mx),
+        mass_y            = np.float32(file_my),
+        event_feat_truth  = event_feat,
+        jets_gen          = jets_gen,   # (N, 8): col0=log_npart, cols1-7=event
+    )
 print(f'[rank {args.rank}] saved → {out_file}')
 print(f'[rank {args.rank}] done in {(time.perf_counter()-t1)/60:.2f} min total')

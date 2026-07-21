@@ -8,25 +8,29 @@
 #SBATCH --gpus=4
 #SBATCH --mem=128G
 #SBATCH --time=04:00:00
-#SBATCH --job-name=e029_sm_infer
-#SBATCH --output=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e029_sm_infer.out
-#SBATCH --error=/pscratch/sd/l/lcondren/MCsim/full_event_mixed/logs/%j_e029_sm_infer.err
+#SBATCH --job-name=a015t_e030_val5k
+#SBATCH --output=/pscratch/sd/l/lcondren/MCsim/full_event_val5k/logs/%j_a015t_e030_val5k.out
+#SBATCH --error=/pscratch/sd/l/lcondren/MCsim/full_event_val5k/logs/%j_a015t_e030_val5k.err
 
-# E029 holdout inference — 4 SM processes in parallel (one per GPU).
-# Runs on holdout events [490000:495000] per process = 5k × 4 = 20k total.
-# Uses truth event features (stage-2 isolation test).
-# 500 DDPM steps.
+# A015-t — E030 inference on the new 5k validation MC events (full_event_val5k/).
+# Checkpoint: E030 epoch-153 weights (same as A013-t).
+# Architecture: PET_pp_parton_vpar_bsm_event_c_stage1 (num_jet=8).
+# Input data: /pscratch/sd/l/lcondren/MCsim/full_event_val5k/ (5k events per process).
+# holdout_start=0 because val5k files start at index 0.
+# Stats file taken from original checkpoint dir — normalisation must match training.
 
-SCRIPT=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts/sm_4proc_infer_event_c_layers4.py
+SCRIPT=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts/sm_5proc_infer_event_c_stage1.py
+VAL_DIR=/pscratch/sd/l/lcondren/MCsim/full_event_val5k
 SM_DIR=/pscratch/sd/l/lcondren/MCsim/full_event_mixed
-RUN_NAME=sm_4proc_event_c_layers4_full
-CKPT_DIR=${SM_DIR}/checkpoints_sm_4proc
-OUT_DIR=${CKPT_DIR}/${RUN_NAME}/infer_holdout_truth
+RUN_NAME=sm_5proc_event_c_stage1
+CKPT_DIR=${SM_DIR}/checkpoints_sm_5proc
+OUT_DIR=${CKPT_DIR}/${RUN_NAME}/infer_val5k_ep153
 
-mkdir -p ${SM_DIR}/logs
+mkdir -p ${VAL_DIR}/logs
 mkdir -p ${OUT_DIR}
 
 echo "Job ${SLURM_JOB_ID} started: $(date)"
+echo "Input data: ${VAL_DIR}"
 echo "Checkpoint: ${CKPT_DIR}/${RUN_NAME}/pet_pp.weights.h5"
 echo "Output dir: ${OUT_DIR}"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
@@ -35,15 +39,17 @@ module load tensorflow/2.15.0
 export PYTHONPATH=/global/u2/l/lcondren/ContinuousParamFit/omnilearn_pp/scripts
 
 COMMON_ARGS="
-    --sm_dir         ${SM_DIR}
+    --sm_dir         ${VAL_DIR}
     --ckpt_dir       ${CKPT_DIR}
     --run_name       ${RUN_NAME}
     --out_dir        ${OUT_DIR}
-    --holdout_start  490000
+    --stats_path     ${CKPT_DIR}/normalisation_stats_sm5proc_stage1.json
+    --holdout_start  0
     --n_total        5000
     --npart          500
     --num_layers     8
     --num_gen_layers 4
+    --num_jet_mlp    512
     --proj_dim       128
     --num_steps      500
     --use_truth_jet

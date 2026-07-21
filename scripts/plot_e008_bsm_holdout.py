@@ -229,13 +229,13 @@ print('Plot 3: jet observables ...')
 from pyjet import cluster, DTYPE_PTEPM
 
 R_JET = 0.4; PT_MIN = 20.0; BETA_N = 1.0
-# PDG norm÷10 encoding. X/Y bosons have pdg_norm=0 (known bug) so map to FL_G.
+# PDG norm÷10 encoding. X/Y bosons have pdg_norm=0 (known bug); resolved via slot index.
 _PDG_TO_FL = [0, 1, 1, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4]
-FL_G, FL_L, FL_C, FL_B, FL_T = 0, 1, 2, 3, 4
-FLAVOR_NAMES = ['Boson/Gluon', 'Light (u/d/s)', 'Charm', 'Bottom', 'Top']
-TRUTH_COL = ['#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#d62728']
-GEN_COL   = ['#aec7e8', '#98df8a', '#ffbb78', '#c5b0d5', '#f5a9a9']
-N_FL = 5
+FL_G, FL_L, FL_C, FL_B, FL_T, FL_X, FL_Y = 0, 1, 2, 3, 4, 5, 6
+FLAVOR_NAMES = ['Boson/Gluon', 'Light (u/d/s)', 'Charm', 'Bottom', 'Top', 'X', 'Y']
+TRUTH_COL = ['#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#d62728', '#8c564b', '#e377c2']
+GEN_COL   = ['#aec7e8', '#98df8a', '#ffbb78', '#c5b0d5', '#f5a9a9', '#c49c94', '#f7b6d2']
+N_FL = 7
 
 def _dphi(a, b):          return (a - b + np.pi) % (2*np.pi) - np.pi
 def _dR(e1, p1, e2, p2):  return np.sqrt((e1-e2)**2 + _dphi(p1, p2)**2)
@@ -248,9 +248,9 @@ def _to_psj(parts_ev, mask_bool):
     arr['phi'] = np.arctan2(p[:, 1], p[:, 2]); return arr
 
 def _jet_fl(jet_eta, jet_phi, pf_ev):
-    # pf_ev is (4, 7): feature[4]=pdg_norm, feature[5]=charge
-    # X/Y bosons: pdg_norm=0 (bug) → maps to FL_G; beams: pdg_norm=0.3 → also FL_G
-    best_dr, best_pdg = np.inf, None
+    # slot 2 = X boson, slot 3 = Y boson (by construction in BSM data).
+    # pdg_norm=0 for both (known encoding bug) — use slot index instead of PDG.
+    best_dr, best_fl = np.inf, FL_L
     for slot in range(2, pf_ev.shape[0]):
         if float(pf_ev[slot, 5]) < 0.5: continue
         pz_e  = float(np.clip(pf_ev[slot, 3], -1+1e-7, 1-1e-7))
@@ -259,9 +259,13 @@ def _jet_fl(jet_eta, jet_phi, pf_ev):
         dr = _dR(jet_eta, jet_phi, eta_p, phi_p)
         if dr < best_dr:
             best_dr = dr
-            best_pdg = int(round(float(pf_ev[slot, 4]) * 10))
-    if best_dr > R_JET or best_pdg is None: return FL_L
-    return _PDG_TO_FL[min(best_pdg, 12)]
+            pdg_c = int(round(float(pf_ev[slot, 4]) * 10))
+            if pdg_c == 0:  # BSM boson: resolve by slot
+                best_fl = FL_X if slot == 2 else FL_Y
+            else:
+                best_fl = _PDG_TO_FL[min(pdg_c, 12)]
+    if best_dr > R_JET: return FL_L
+    return best_fl
 
 def _measure_jet(jet, pf_ev):
     cs = jet.constituents()
@@ -339,8 +343,7 @@ for key, r in mass_points.items():
     print(f'  {key}: active flavors={[FLAVOR_NAMES[f] for f in _plot_fl]}')
     fig, axes_j = plt.subplots(7, _n_cols, figsize=(3.5*_n_cols, 26),
                                constrained_layout=True, squeeze=False)
-    fig.suptitle(f'Jet observables — {r["label"]}\nanti-kT R={R_JET}, pT>{PT_MIN:.0f} GeV\n'
-                 f'(Note: X/Y boson PDG encoded as 0 due to known data bug → all in Boson/Gluon bin)',
+    fig.suptitle(f'Jet observables — {r["label"]}\nanti-kT R={R_JET}, pT>{PT_MIN:.0f} GeV',
                  fontsize=9)
     for row, (tidx, ylab, bins_fn) in enumerate(_OBS):
         at_all = _t[tidx]; ag_all = _g[tidx]
@@ -447,7 +450,10 @@ def _parton_cone_measure(parts_arr, mask_arr, parton_feat_arr):
             phi_p = np.arctan2(float(parton_feat_arr[i, slot, 1]),
                                float(parton_feat_arr[i, slot, 2]))
             pdg_c = int(round(float(parton_feat_arr[i, slot, 4]) * 10))
-            fl    = _PDG_TO_FL[min(pdg_c, 12)]
+            if pdg_c == 0:  # BSM boson: resolve by slot
+                fl = FL_X if slot == 2 else FL_Y
+            else:
+                fl = _PDG_TO_FL[min(pdg_c, 12)]
             if len(eta_all) > 0:
                 in_cone = _dR(eta_all, phi_all, eta_p, phi_p) < R_JET
                 cpt = pT[in_cone]; ceta = eta_all[in_cone]; cphi = phi_all[in_cone]

@@ -2,7 +2,7 @@
 
 Source of truth for what's running, what's done, and what each result means.
 
-Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job 55726504)
+Last updated: 2026-07-21 (A020 e2e completed; A020-t/A021/A021-s1/A021-t queued; A017/A017-t completed; E031 ep34, E032 ep95)
 
 ---
 
@@ -10,24 +10,13 @@ Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job
 
 | ID | Status | Submitted | Type | Run name | Slurm job | Notes |
 |----|--------|-----------|------|----------|-----------|-------|
-| E030 | RUNNING | 2026-07-09 | training | `sm_5proc_event_c_stage1` | 55726504 | SM 5-process stage-1 diffusion; identical arch to E023 (num_jet=8, num_gen_layers=4, num_jet_mlp=512) but trained on full_event_mixed/ 5-proc SM data instead of W' BSM grid |
-| E029 | RUNNING | 2026-07-07 | training | `sm_4proc_event_c_layers4_full` | 55662074 | SM 4-process full-data training; same arch as E027 but no --n_train limit → 480k events/rank → 3750 steps/epoch; holdout [490k:500k], inference 5k/process |
-| E028 | FAILED | 2026-07-07 | data generation | `wprime_signal_mpi` | 55661111 | W' 144-pt grid regen with MPI on — FAILED: Pythia8 hangs during MPI init for non-SM W' process; 0 events generated in 2–4h; reverted to MPI=off |
-| E008 | RUNNING | 2026-06-14 | training | `bsm_grid` | 54707121 | Epoch 55/200, val_loss=4.900; continuation job (prior jobs: 54455691 and chain) |
-| A007 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_holdout_ep055_5k` | 54716471 | Mid-training holdout inference at epoch ~55; 4 holdout pts (250,250)(250,300)(300,250)(300,300), 5k events, 500 steps; submit: `submit_e008_holdout_infer_ep055.sh` |
-| A008 | RUNNING | 2026-06-19 | diagnostic (inference) | `bsm_grid → infer_trained_ep019_5k` | 54677288 | Trained-point inference for mass-overlay comparison; 4 trained pts (200,200)(200,350)(350,200)(350,350), used with `plot_e008_mass_overlay.py` to confirm model fans out with mass |
+| A021-t | PENDING | 2026-07-21 | inference (truth-cond) | `bsm_grid_event_c_stage1_mpi/infer_holdout_truth` | 56205487 | E032 mid-training truth-cond; --use_truth_jet --use_true_event; 4 holdout pts × 5k; epoch 95 ckpt |
+| A021-s1 | PENDING | 2026-07-21 | inference (stage-1 only) | `bsm_grid_event_c_stage1_mpi/infer_holdout_stage1only` | 56205483 | E032 stage-1 only; new --stage1_only flag; saves jets_gen(N,8) only; 4 holdout pts × 5k |
+| A021 | PENDING | 2026-07-21 | inference (e2e) | `bsm_grid_event_c_stage1_mpi/infer_holdout_e2e` | 56205482 | E032 mid-training e2e; 4 holdout pts × 5k × 500 steps; epoch 95 ckpt |
+| A020-t | PENDING | 2026-07-21 | inference (truth-cond) | `bsm_grid_event_c_layers4_mpi/infer_holdout_truth` | 56205479 | E031 mid-training truth-cond; --use_truth_jet; 4 holdout pts × 5k × 500 steps; epoch 34 ckpt |
+| E032 | RUNNING | 2026-07-13 | training | `bsm_grid_event_c_stage1_mpi` | 56194245 (pending continuation) | BSM grid stage-1 on MPI-on W' data; epoch 95/200, val_loss=4.970; self-resubmitting chain |
+| E031 | RUNNING | 2026-07-13 | training | `bsm_grid_event_c_layers4_mpi` | 56258645 (pending continuation) | BSM grid layers4 on MPI-on W' data; epoch 34/200, val_loss=5.279; self-resubmitting chain |
 | E016 | PLANNED | — | validation | `parnassus_validation` | — | Test Parnassus output on W'→4q signal; compare to dijet training-domain behavior |
-| E020a | RUNNING | 2026-06-19 | training | `bsm_grid_event_a` | 54738498 | Event-level MET conditioning (3 feat); epoch 49/200 val_loss=4.899; self-resubmitting |
-| E020b | RUNNING | 2026-06-19 | training | `bsm_grid_event_b` | 54738499 | Event-level cone_X conditioning (2 feat); epoch 51/200 val_loss=4.899; self-resubmitting |
-| E020c | RUNNING | 2026-06-19 | training | `bsm_grid_event_c` | 54738501 | Event-level all-7 event features; epoch 56/200 val_loss=4.896; self-resubmitting |
-| E022  | CANCELLED | 2026-07-06 | training | `bsm_grid_event_c_layers4` | 55094220→55617495 | Cancelled (job 55617495) to start E027 SM training |
-| E023  | CANCELLED | 2026-07-06 | training | `bsm_grid_event_c_stage1` | 55355425→55602074 | Cancelled (jobs 55602074+55616460) to start E027 SM training |
-| A010-t | RUNNING | 2026-07-05 | inference (holdout, truth-cond) | `bsm_grid_event_c_layers4/infer_holdout_truth` | 55529568 | E022 truth-conditioned holdout; 4 pts × 5k events × 500 steps |
-| A011-t | RUNNING | 2026-07-05 | inference (holdout, truth-cond) | `bsm_grid_event_c_stage1/infer_holdout_truth` | 55529570 | E023 truth-conditioned holdout (--use_true_event); directly comparable to A009c-t |
-| A011-p | RUNNING | 2026-07-05 | inference (holdout, generated) | `bsm_grid_event_c_stage1/infer_holdout_pred` | 55529572 | E023 full generated pipeline; stage-1 generates event features from partons |
-| A009a-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_a/infer_holdout_truth` | 55037853 | E020a truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
-| A009b-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_b/infer_holdout_truth` | 55037857 | E020b truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
-| A009c-t | RUNNING | 2026-06-25 | inference (holdout, truth-cond) | `bsm_grid_event_c/infer_holdout_truth` | 55037860 | E020c truth-conditioned holdout; 4 pts × 5k events × 500 steps; 4 GPUs parallel |
 
 ---
 
@@ -45,6 +34,34 @@ Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job
 
 | ID | Completed | Type | Run name | Key result | Notes |
 |----|-----------|------|----------|------------|-------|
+| A020 | 2026-07-21 | inference (e2e) | `bsm_grid_event_c_layers4_mpi/infer_holdout_e2e` | 4 BSM holdout pts × 5k events complete | Job 56205478; E031 epoch 34 ckpt (val_loss=5.279); MPI-on data; plots at `plots_a020_e2e/` |
+| A017-t | 2026-07-19 | inference (e2e) | `sm_5proc_event_c_stage1/infer_holdout_e2e_10k_ep153` | 4 procs × 10k events complete (~315 MB) | Job 56067378; E030 epoch 153; stage-1 → stage-2 e2e; no truth bypass |
+| A017 | 2026-07-19 | inference (e2e) | `sm_4proc_event_c_layers4_full/infer_holdout_e2e_10k_ep178` | 4 procs × 10k events complete (~315 MB) | Job 56067377; E029 epoch 178; stage-1 generates log_npart; truth event features still injected (layers4 design) |
+| A016 | 2026-07-15 | post-processing | `infer_combined_10k_ep178/153` | 10k truth-cond events per process per model written | Job 56036672; E029 → `infer_combined_10k_ep178/`, E030 → `infer_combined_10k_ep153/`; 4×269 MB per model |
+| A015-t | 2026-07-15 | inference (truth-cond) | `sm_5proc_event_c_stage1/infer_val5k_ep153` | 4 procs × 5k events complete | Job 56036671 (retry after stats-path bug fix); output at `infer_val5k_ep153/` |
+| A015 | 2026-07-15 | inference (truth-cond) | `sm_4proc_event_c_layers4_full/infer_val5k_ep178` | 4 procs × 5k events complete | Job 55980966; output at `infer_val5k_ep178/` |
+| A014 | 2026-07-15 | data generation | `full_event_val5k` | 5k events/process (dijet/ttbar/wjets/zjets) at full_event_val5k/ | Job 55980965 (retry after Pythia8 XML path fix); seed=100; Pythia8 XML fix applied to both SM gen scripts |
+| A013-t | 2026-07-15 | inference (truth-cond) | `sm_5proc_event_c_stage1/infer_holdout_truth_ep153` | 4 procs × 5k events complete | Job 55953501; output at `infer_holdout_truth_ep153/` |
+| A013 | 2026-07-15 | inference (truth-cond) | `sm_4proc_event_c_layers4_full/infer_holdout_truth_ep178` | 4 procs × 5k events complete | Job 55953500; output at `infer_holdout_truth_ep178/` |
+| E030 | 2026-07-15 | training | `sm_5proc_event_c_stage1` | Converged at epoch 153/200, best val_loss=5.139; stopped by user | Jobs 55891516→55932429; stopped epoch 153, val_loss 5.139 (part=4.561, jet=0.578) |
+| E029 | 2026-07-15 | training | `sm_4proc_event_c_layers4_full` | Converged at epoch 178/200, best val_loss ~5.505; stopped by user | Jobs 55891687→55929292; stopped epoch 178, val_loss oscillating 5.50–5.53; patience=30 not yet triggered |
+| A012-t | 2026-07-12 | inference (truth-cond) | `sm_5proc_event_c_stage1/infer_holdout_truth` | 4/5 processes complete (dijet/ttbar/wjets/zjets); wprime skipped (no holdout events) | Job 55821430; plots at `plots_holdout_truth/`; use_true_event fix applied to sm_5proc_infer_event_c_stage1.py |
+| A012 | 2026-07-12 | inference (truth-cond) | `sm_4proc_event_c_layers4_full/infer_holdout_truth` | 4 processes complete; dijet/ttbar/wjets/zjets 5k events each | Job 55806802; plots at `checkpoints_sm_4proc/sm_4proc_event_c_layers4_full/plots_holdout_truth/` |
+| E028 | 2026-07-13 | data generation | `wprime_signal_mpi` | All 144/144 mass-point HDF5 files + background.hdf5 generated with MPI=on | Jobs 55800478→55801273 (signal), 55881116 (background); data at `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/`; root fix: explicit Pythia8 XML path |
+| A011-p | 2026-07-05 | inference (generated) | `bsm_grid_event_c_stage1/infer_holdout_pred` | 4 holdout pts complete; full stage-1+2 pipeline without truth event features | Job 55529572; E023 checkpoint at epoch 69 (val_loss=4.693) |
+| A011-t | 2026-07-05 | inference (truth-cond) | `bsm_grid_event_c_stage1/infer_holdout_truth` | 4 holdout pts complete; truth event features bypassing stage-1 | Job 55529570; E023 checkpoint at epoch 69 |
+| A010-t | 2026-07-05 | inference (truth-cond) | `bsm_grid_event_c_layers4/infer_holdout_truth` | 4 holdout pts complete | Job 55529568; E022 checkpoint at epoch 25 (val_loss=4.894) |
+| A009a-t | 2026-06-25 | inference (truth-cond) | `bsm_grid_event_a/infer_holdout_truth` | 4 holdout pts complete | Job 55037853; E020a at epoch 60 |
+| A009b-t | 2026-06-25 | inference (truth-cond) | `bsm_grid_event_b/infer_holdout_truth` | 4 holdout pts complete | Job 55037857; E020b at epoch 66 |
+| A009c-t | 2026-06-25 | inference (truth-cond) | `bsm_grid_event_c/infer_holdout_truth` | 4 holdout pts complete | Job 55037860; E020c at epoch 61 |
+| A008 | 2026-06-19 | inference (trained pts) | `bsm_grid/infer_trained_ep019_5k` | 4 trained pts complete: (200,200)(200,350)(350,200)(350,350) | Job 54677288 |
+| A007 | 2026-06-19 | inference (holdout) | `bsm_grid/infer_holdout_ep055_5k` | **PARTIAL** — 2/4 holdout pts only: (250,250)(250,300); job timed out | Job 54716471 TIMEOUT; (300,250)(300,300) missing |
+| E023 | 2026-07-06 | training (cancelled) | `bsm_grid_event_c_stage1` | Cancelled at epoch 69, val_loss=4.693; superseded by E032 (MPI-on data) | Jobs 55355425→55602074; checkpoint preserved at `wprime_signal/checkpoints_bsm_grid/bsm_grid_event_c_stage1/` |
+| E022 | 2026-07-06 | training (cancelled) | `bsm_grid_event_c_layers4` | Cancelled at epoch 25, val_loss=4.894; superseded by E031 (MPI-on data) | Jobs 55094220→55617495; checkpoint preserved |
+| E020c | 2026-06-19 | training | `bsm_grid_event_c` | Stalled at epoch 61/200, val_loss=4.895; self-resubmit chain ended (no active job) | Last job 54738501; not marked done in training_state.json — chain broke |
+| E020b | 2026-06-19 | training | `bsm_grid_event_b` | Stalled at epoch 66/200, val_loss=4.897; chain ended | Last job 54738499 |
+| E020a | 2026-06-19 | training | `bsm_grid_event_a` | Stalled at epoch 60/200, val_loss=4.897; chain ended | Last job 54738498 |
+| E008 | 2026-06-14 | training | `bsm_grid` | Stalled at epoch 65/200, val_loss=4.899; chain ended | Last job 54707121; not marked done — chain broke |
 | E027 | 2026-07-07 | training | `sm_4proc_event_c_layers4` | val_loss=5.530 at epoch 200; **undertrained** — used only n_train=20k/process (4% of data) → 156 steps/epoch | 3 jobs: 55618161, 55619116, 55623267; superseded by E029 (full-data retrain) |
 | E026 | 2026-07-06 | data generation | `wprime_signal_grid` | 144 × 100k events complete at `/pscratch/sd/l/lcondren/MCsim/wprime_signal/`; Pythia8-only | MG5 attempt abandoned (SM EW constraint); `generate_wprime_signal.py` fixed (N_PARTONS=4, --task-id added) |
 | E024 | 2026-07-06 | post-processing diagnostic | `met_postprocessing_diagnostic` | MET W₁ improved 22× (0.033→0.0015); logpT degraded 3.6× | Uniform correction; detailed results in detail section |
@@ -67,6 +84,57 @@ Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job
 
 ---
 
+### A020 — E031 mid-training e2e BSM inference (bsm_grid_event_c_layers4_mpi / infer_holdout_e2e)
+
+- **Date completed:** 2026-07-21 (~02:25)
+- **Type:** Inference (end-to-end)
+- **Checkpoint:** E031 epoch 34/200, val_loss=5.279 (part=?, jet=?) — mid-training snapshot
+- **Goal:** First end-to-end BSM inference on the MPI-on W' data (E028). Stage-1 generates log_npart from parton conditioning; stage-2 conditions on that plus truth event features (MET, cone pT/mass — layers4 design always uses truth event features). 4 holdout points × 5000 events × 500 DDPM steps.
+- **Output:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_layers4_mpi/infer_holdout_e2e/` — 4 × ~49 MB NPZ files
+- **Plots:** `plots_a020_e2e/` — particle_dists.png, global_obs.png, jet_obs_{key}.png, jet_images_{key}.png, parton_cone_{key}.png (per mass point)
+- **Slurm job:** 56205478
+- **Script:** `omnilearn_pp/scripts/infer_bsm_grid_event_c_layers4.py`
+- **Submit script:** `omnilearn_pp/submit_a020_e031_infer_e2e.sh`
+- **Status:** COMPLETE
+- **Interpretation:** Mid-training snapshot at epoch 34 on MPI-on data. Truth-cond comparison (A020-t) pending — will isolate stage-2 quality from any stage-1 log_npart error.
+- **Linked experiments:** E031 (training source); A020-t (truth-cond complement); A011-p (prior e2e at E023 epoch 69, MPI-off data — direct predecessor for quality comparison)
+
+---
+
+### E032 — BSM grid stage-1 training on MPI-on W' data (bsm_grid_event_c_stage1_mpi)
+
+- **Date submitted:** 2026-07-13
+- **Type:** Training
+- **Goal:** Retrain E023 (stage-1 architecture) on the new MPI-on W' signal grid. E023 used MPI=off data (`wprime_signal/`); this run uses the MPI=on data (`wprime_signal_mpi/`) generated by E028. Identical setup otherwise: same holdout points, same hypers.
+- **Architecture:** Identical to E023 — `PET_pp_parton_vpar_bsm_event_c_stage1`, num_layers=8, num_gen_layers=2, proj_dim=128, num_jet_mlp=512, num_jet=8.
+- **Data:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/` — 144 signal files + background.hdf5 (MPI=on). val_start=80000, n_train=20000/file, n_val=10000/file. Holdout: (250,250)(250,300)(300,250)(300,300).
+- **Scripts:**
+  - Architecture: `omnilearn_pp/scripts/PET_pp_parton_vpar_bsm_event_c_stage1.py`
+  - Training: `omnilearn_pp/scripts/bsm_grid_train_event_c_stage1.py`
+  - Submit: `omnilearn_pp/submit_e032_bsm_grid_mpi_stage1.sh` (self-resubmitting)
+- **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_stage1_mpi/`
+- **Slurm job:** 55889886 (self-resubmitting chain; continuation 55898468 queued)
+- **Status:** RUNNING — epoch 11/200, val_loss=4.991 (part=4.369, jet=0.622) as of 2026-07-14
+
+---
+
+### E031 — BSM grid layers4 training on MPI-on W' data (bsm_grid_event_c_layers4_mpi)
+
+- **Date submitted:** 2026-07-13
+- **Type:** Training
+- **Goal:** Retrain E022 (layers4 architecture) on the new MPI-on W' signal grid. E022 used MPI=off data (`wprime_signal/`); this run uses the MPI=on data (`wprime_signal_mpi/`) generated by E028. Identical setup otherwise.
+- **Architecture:** Identical to E022 — `PET_pp_parton_vpar_bsm_event_c_layers4`, num_layers=8, num_gen_layers=4, proj_dim=128.
+- **Data:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/` — 144 signal files + background.hdf5 (MPI=on). val_start=80000, n_train=20000/file, n_val=10000/file. Holdout: (250,250)(250,300)(300,250)(300,300).
+- **Scripts:**
+  - Architecture: `omnilearn_pp/scripts/PET_pp_parton_vpar_bsm_event_c_layers4.py`
+  - Training: `omnilearn_pp/scripts/bsm_grid_train_event_c_layers4.py`
+  - Submit: `omnilearn_pp/submit_e031_bsm_grid_mpi_layers4.sh` (self-resubmitting)
+- **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_layers4_mpi/`
+- **Slurm job:** 55889809 (self-resubmitting chain; continuation 55898468 queued)
+- **Status:** RUNNING — epoch 9/200, val_loss=5.291 (part=4.370, jet=0.921) as of 2026-07-14
+
+---
+
 ### E030 — SM 5-process stage-1 diffusion (sm_5proc_event_c_stage1)
 
 - **Date submitted:** 2026-07-09
@@ -82,8 +150,8 @@ Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job
   - Submit: `omnilearn_pp/submit_e030_sm_5proc_stage1_train.sh` (self-resubmitting)
 - **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/checkpoints_sm_5proc/sm_5proc_event_c_stage1/`
 - **Stats file:** `checkpoints_sm_5proc/normalisation_stats_sm5proc_stage1.json` (8-dim combined jet stats; computed on first run)
-- **Slurm job:** 55726504 (self-resubmitting chain)
-- **Status:** RUNNING
+- **Slurm job:** 55891516 → 55932429 (final job)
+- **Status:** COMPLETE (stopped by user at convergence) — final epoch 153/200, best val_loss=5.139 (part=4.561, jet=0.578). Val_loss plateaued around 5.139–5.153 for many epochs. Mid-training truth-conditioned inference completed (A012-t): 4/5 SM processes, plots at `checkpoints_sm_5proc/sm_5proc_event_c_stage1/plots_holdout_truth/`.
 
 ---
 
@@ -101,8 +169,8 @@ Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job
   - Inference: `omnilearn_pp/submit_e029_sm_4proc_infer.sh` (4 processes × 5k events × 500 DDPM steps)
 - **Checkpoint dir:** `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/checkpoints_sm_4proc/sm_4proc_event_c_layers4_full/`
 - **Difference from E027:** One change — `--n_train 20000` removed. Everything else identical (arch, data, hypers).
-- **Slurm job:** 55662074 (self-resubmitting chain)
-- **Status:** RUNNING
+- **Slurm job:** 55891687 → 55929292 (final job)
+- **Status:** COMPLETE (stopped by user at convergence) — final epoch 178/200, val_loss oscillating ~5.505–5.525 for 30+ epochs; no meaningful improvement since ~epoch 150. Mid-training truth-conditioned inference completed (A012): 4 SM processes, plots at `checkpoints_sm_4proc/sm_4proc_event_c_layers4_full/plots_holdout_truth/`. Best checkpoint preserved at checkpoint dir.
 
 ---
 
@@ -115,10 +183,13 @@ Last updated: 2026-07-09 (E030 submitted — SM 5-process stage-1 diffusion, job
 - **Change from E026:** Single line in `generate_wprime_signal.py`: `PartonLevel:MPI = off → on` (applied to both signal and background initializers).
 - **Old data preserved:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal/` (MPI off) is unchanged — required by active E008/E020a/b/c/E022/E023 experiments.
 - **New data location:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/`
-- **Script:** `fpcd_full_event/generate_wprime_signal.py` (MPI=on as of this commit)
-- **Submit script:** `fpcd_full_event/submit_wprime_grid_mpi.sh` — 144-task SLURM array, 2h/task (MPI adds ~30–40% generation cost)
-- **Slurm job:** 55661111 (array 0–143)
-- **Status:** FAILED — Pythia8 hangs during MPI initialization for the non-SM W' process. Enabling `PartonLevel:MPI = on` causes Pythia8 to loop indefinitely during MPI cross-section setup because the MPI framework cannot sample cross-sections for BSM particles. Zero events were generated across all 144 tasks (confirmed: tasks ran for full 2–4h walltime and produced only the startup print line). Generator reverted to `MPI = off`. Existing MPI-off data at `/pscratch/sd/l/lcondren/MCsim/wprime_signal/` (E026) remains the canonical W' dataset. The MET domain gap between SM (MPI on) and W' (MPI off) is a known caveat.
+- **Scripts:**
+  - Signal: `fpcd_full_event/generate_wprime_signal.py` (MPI=on, explicit Pythia8 XML path fix)
+  - Submit: `fpcd_full_event/submit_wprime_parallel.sh` (16 tasks at a time, self-resubmitting)
+  - Background: `fpcd_full_event/submit_wprime_mpi_background.sh`
+- **Slurm jobs:** 55661111 (original FAILED array); 55800478→55801273 (fixed signal); 55881116 (background)
+- **Root cause of original failure:** `pythia8.Pythia("", False)` with empty xmlDir relies on `$PYTHIA8DATA` env var, which is not set on NERSC compute nodes in the mg5_new conda env. With `Print:quiet=on`, this causes a silent hang rather than an error message. Fix: compute `_PYTHIA8DATA` from `pythia8.__file__` at import time (4 parent levels up to conda env root + `share/Pythia8/xmldoc`), pass explicitly to both Pythia constructors.
+- **Status:** COMPLETE — all 144/144 signal files + background.hdf5 (536 MB) at `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/`. Signal rate ~134 ev/s, background ~112 ev/s. Used by E031 and E032.
 
 ---
 

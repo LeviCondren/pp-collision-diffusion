@@ -50,7 +50,11 @@ inference_results = {}
 for proc in PROCS:
     path = f'{NPZ_DIR}/{proc}_20k.npz'
     if not os.path.exists(path):
-        print(f'  {proc}: {path} not found, skipping')
+        path = f'{NPZ_DIR}/{proc}_rank00_of01.npz'
+    if not os.path.exists(path):
+        path = f'{NPZ_DIR}/{proc}.npz'
+    if not os.path.exists(path):
+        print(f'  {proc}: not found in {NPZ_DIR}, skipping')
         continue
     d = np.load(path)
     inference_results[proc] = {
