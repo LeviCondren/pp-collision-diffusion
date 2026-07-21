@@ -200,18 +200,126 @@ Key files:
 
 ---
 
+## Active models (as of 2026-07-21)
+
+Four checkpoints are published at **[Levicondren/pet-pp-checkpoints](https://huggingface.co/Levicondren/pet-pp-checkpoints)** (private). Download with:
+
+```bash
+pip install huggingface_hub
+export HF_TOKEN=<your_token>
+huggingface-cli download Levicondren/pet-pp-checkpoints \
+    --repo-type model --local-dir ./pet-pp-checkpoints --token $HF_TOKEN
+```
+
+Each HF directory contains `pet_pp.weights.h5`, `training_state.json`, and the relevant normalisation stats JSON(s). Place the weights file at the `ckpt_dir` path expected by the training script (see below), and put the stats JSON(s) at the paths listed.
+
+---
+
+### E029 — SM stage-2 (layers4), epoch 178/200 — **complete**
+
+- **Architecture:** `PET_pp_parton_vpar_bsm_event_c_layers4` (`num_gen_layers=4`)
+- **Training script:** `scripts/sm_4proc_train_event_c_layers4.py`
+- **Submit script:** `submit/submit_e029_sm_4proc_infer.sh` (reference for args)
+- **HF directory:** `e029_sm_stage2_ep178/`
+- **Checkpoint path:** `<data_dir>/checkpoints_sm_4proc/sm_4proc_event_c_layers4_full/pet_pp.weights.h5`
+- **Stats files:**
+  - `normalisation_stats_sm4proc.json` → `<data_dir>/normalisation_stats_sm4proc.json`
+  - `normalisation_stats_event_c_sm4proc.json` → `<data_dir>/normalisation_stats_event_c_sm4proc.json`
+- **Data:** 4 SM processes (dijet, ttbar, wjets, zjets); train [0:480k], val [480k:490k], holdout [490k:500k]
+- **Resume command:**
+```bash
+export PYTHONPATH=/path/to/repo/scripts
+horovodrun --gloo -np 1 python3 scripts/sm_4proc_train_event_c_layers4.py \
+    --data_dir <data_dir> \
+    --run_name sm_4proc_event_c_layers4_full \
+    --val_start 480000 \
+    --epoch 200 --batch 128 --lr 3e-4 --lr_body 1e-4 \
+    --num_layers 8 --num_gen_layers 4 --proj_dim 128
+```
+
+---
+
+### E030 — SM stage-1, epoch 153/200 — **complete**
+
+- **Architecture:** `PET_pp_parton_vpar_bsm_event_c_stage1` (`num_gen_layers=2`, `num_jet_mlp=512`, `num_jet=8`)
+- **Training script:** `scripts/sm_5proc_train_event_c_stage1.py`
+- **Submit script:** `submit/submit_e031_bsm_grid_mpi_layers4.sh` (reference for args structure)
+- **HF directory:** `e030_sm_stage1_ep153/`
+- **Checkpoint path:** `<data_dir>/checkpoints_sm_5proc/sm_5proc_event_c_stage1/pet_pp.weights.h5`
+- **Stats files:**
+  - `normalisation_stats_sm5proc_stage1.json` → `<data_dir>/checkpoints_sm_5proc/normalisation_stats_sm5proc_stage1.json`
+- **Data:** 5 SM processes (dijet, ttbar, wjets, zjets, wprime); train [0:480k], val [480k:490k]
+- **Resume command:**
+```bash
+export PYTHONPATH=/path/to/repo/scripts
+horovodrun --gloo -np 1 python3 scripts/sm_5proc_train_event_c_stage1.py \
+    --data_dir <data_dir> \
+    --run_name sm_5proc_event_c_stage1 \
+    --val_start 480000 \
+    --epoch 200 --batch 128 --lr 3e-4 --lr_body 1e-4 \
+    --num_layers 8 --num_gen_layers 2 --proj_dim 128 --num_jet_mlp 512
+```
+
+---
+
+### E031 — W' stage-2 (layers4), mid-training — **in progress**
+
+- **Architecture:** `PET_pp_parton_vpar_bsm_event_c_layers4` (`num_gen_layers=4`)
+- **Training script:** `scripts/bsm_grid_train_event_c_layers4.py`
+- **Submit script:** `submit/submit_e031_bsm_grid_mpi_layers4.sh`
+- **HF directory:** `e031_wprime_stage2_ep<N>/`
+- **Checkpoint path:** `<grid_dir>/checkpoints_bsm_grid/bsm_grid_event_c_layers4_mpi/pet_pp.weights.h5`
+- **Stats files:**
+  - `normalisation_stats.json` → `<grid_dir>/normalisation_stats.json`
+  - `normalisation_stats_event_c.json` → `<grid_dir>/normalisation_stats_event_c.json`
+- **Data:** 144-point W' → WZ → 4q mass grid + background HDF5 (MPI=on); val_start=80000, n_train=20000/file. Holdout: (250,250) (250,300) (300,250) (300,300).
+- **Resume command:**
+```bash
+export PYTHONPATH=/path/to/repo/scripts
+horovodrun --gloo -np 1 python3 scripts/bsm_grid_train_event_c_layers4.py \
+    --grid_dir <grid_dir> \
+    --ckpt_dir <grid_dir>/checkpoints_bsm_grid \
+    --run_name bsm_grid_event_c_layers4_mpi \
+    --val_start 80000 --n_train 20000 \
+    --epoch 200 --batch 128 --lr 3e-4 --lr_body 1e-4 \
+    --num_layers 8 --num_gen_layers 4 --proj_dim 128
+```
+
+---
+
+### E032 — W' stage-1, mid-training — **in progress**
+
+- **Architecture:** `PET_pp_parton_vpar_bsm_event_c_stage1` (`num_gen_layers=2`, `num_jet_mlp=512`, `num_jet=8`)
+- **Training script:** `scripts/bsm_grid_train_event_c_stage1.py`
+- **Submit script:** `submit/submit_e032_bsm_grid_mpi_stage1.sh`
+- **HF directory:** `e032_wprime_stage1_ep<N>/`
+- **Checkpoint path:** `<grid_dir>/checkpoints_bsm_grid/bsm_grid_event_c_stage1_mpi/pet_pp.weights.h5`
+- **Stats files:**
+  - `normalisation_stats_event_c.json` → `<grid_dir>/normalisation_stats_event_c.json`
+- **Data:** Same 144-point W' grid as E031 (MPI=on).
+- **Resume command:**
+```bash
+export PYTHONPATH=/path/to/repo/scripts
+horovodrun --gloo -np 1 python3 scripts/bsm_grid_train_event_c_stage1.py \
+    --grid_dir <grid_dir> \
+    --ckpt_dir <grid_dir>/checkpoints_bsm_grid \
+    --run_name bsm_grid_event_c_stage1_mpi \
+    --val_start 80000 --n_train 20000 \
+    --epoch 200 --batch 128 --lr 3e-4 --lr_body 1e-4 \
+    --num_layers 8 --num_gen_layers 2 --proj_dim 128 --num_jet_mlp 512
+```
+
+---
+
 ## Experiments
 
 See [EXPERIMENTS.md](EXPERIMENTS.md) for the full ledger of all runs, results, and interpretations.
-
-Active experiments (as of 2026-06-11):
-- **E001** — CFG training with 10% process-label dropout
-- **E007** — Auxiliary classification loss on body mean-pooled output
 
 ---
 
 ## Data paths (NERSC Perlmutter)
 
-- Training data: `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/`
-- Checkpoints: `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/checkpoints/`
-- W' signal data: `/pscratch/sd/l/lcondren/MCsim/wprime_inference/`
+- SM training data: `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/`
+- SM checkpoints: `/pscratch/sd/l/lcondren/MCsim/full_event_mixed/checkpoints_sm_4proc/` and `checkpoints_sm_5proc/`
+- W' signal data (MPI=on): `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/`
+- W' checkpoints: `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/checkpoints_bsm_grid/`
