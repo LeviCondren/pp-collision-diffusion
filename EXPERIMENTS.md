@@ -2,7 +2,7 @@
 
 Source of truth for what's running, what's done, and what each result means.
 
-Last updated: 2026-07-21 (A020 e2e completed; A020-t/A021/A021-s1/A021-t queued; A017/A017-t completed; E031 ep34, E032 ep95)
+Last updated: 2026-08-05 (E034 epoch 42/200 training; A027t truth-cond inference complete — plots look excellent; A027 E2E running; E033 chain-break fixed and restarted at epoch 105)
 
 ---
 
@@ -10,6 +10,11 @@ Last updated: 2026-07-21 (A020 e2e completed; A020-t/A021/A021-s1/A021-t queued;
 
 | ID | Status | Submitted | Type | Run name | Slurm job | Notes |
 |----|--------|-----------|------|----------|-----------|-------|
+| A027 | RUNNING | 2026-08-05 | inference (E2E, CFG) | `bsm_grid_event_c_stage1_cfg/infer_holdout_e2e` | 55033664 | E034 ep42 E2E; guidance_scale=1.5; 4 holdout pts × 2k × 500 steps; plot job 55033666 chained |
+| E034 | RUNNING | 2026-08-01 | training | `bsm_grid_event_c_stage1_cfg` | 55030598 (chain: 55031907 queued) | CFG: epoch 42/200, val_loss=4.975; cone mass dropout (prob=0.15); two-pass CFG at inference; self-resubmitting chain |
+| E033 | RUNNING | 2026-07-26 | training | `bsm_grid_event_c_locality` | 55032818 (chain: 55032819 queued) | Epoch 105/200, val_loss=5.021; restarted 2026-08-05 after ARG_MAX chain-break at ep105; LD_LIBRARY_PATH accumulation bug fixed |
+| A026t | COMPLETE | 2026-07-26 | inference (truth-cond) | `bsm_grid_event_c_stage1_mpi_snap_e127/infer_holdout_truth_hpc3` | 54529102 | E032 ep127 --use_truth_jet --use_true_event; stage-2 only; 4 holdout pts × 5k × 500 steps; all 4 NPZs written |
+| A025 | COMPLETE | 2026-07-26 | diagnostic | `diag_mass_overlay` | — (login node) | Gen cone-X sep: 8 GeV (38% of truth 21 GeV); gen cone-Y sep: 3 GeV (17% of truth 18 GeV); explains flat A022 posterior |
 | A021-t | PENDING | 2026-07-21 | inference (truth-cond) | `bsm_grid_event_c_stage1_mpi/infer_holdout_truth` | 56205487 | E032 mid-training truth-cond; --use_truth_jet --use_true_event; 4 holdout pts × 5k; epoch 95 ckpt |
 | A021-s1 | PENDING | 2026-07-21 | inference (stage-1 only) | `bsm_grid_event_c_stage1_mpi/infer_holdout_stage1only` | 56205483 | E032 stage-1 only; new --stage1_only flag; saves jets_gen(N,8) only; 4 holdout pts × 5k |
 | A021 | PENDING | 2026-07-21 | inference (e2e) | `bsm_grid_event_c_stage1_mpi/infer_holdout_e2e` | 56205482 | E032 mid-training e2e; 4 holdout pts × 5k × 500 steps; epoch 95 ckpt |
@@ -34,6 +39,10 @@ Last updated: 2026-07-21 (A020 e2e completed; A020-t/A021/A021-s1/A021-t queued;
 
 | ID | Completed | Type | Run name | Key result | Notes |
 |----|-----------|------|----------|------------|-------|
+| A027t | 2026-08-05 | inference (truth-cond) | `bsm_grid_event_c_stage1_cfg/infer_holdout_truth` | E034 ep42; all 4 NPZs written; full plot suite complete; distributions look excellent — generated peaks well-centered on truth masses, rel-W₁ ~0.019 mean for cone masses | Job 55033665; 2k events/pt; guidance_scale N/A (truth bypass); artifact: https://claude.ai/code/artifact/36bfa564-051f-433d-8870-8924bfa171fb |
+| A024-fixmet | 2026-07-26 | post-processing + plots | `infer_holdout_e2e_fixmet` | MET residual 35 GeV → <0.002 GeV; new plot set at `plots_a024_e2e_fixmet/` | apply_fix_met.py applied to all 4 A024 NPZs; 9–16 particles skipped/mass point; gallery at artifact 3f642400 |
+| A022 | 2026-07-26 | mass posterior (ELBO) | `bsm_grid_event_c_layers4_mpi_snap_e054` | All 4 mass points scored; argmax misses in all cases; posterior nearly flat (ΔLL range 0.33–0.44 nats) | 54491919 completed; E031 ep54 mid-training; true mass ranks 5,5,10,50 / 144; artifact 328590f1 |
+| A024 | 2026-07-25 | inference (e2e) | `bsm_grid_event_c_stage1_mpi_snap_e127/infer_holdout_e2e_hpc3` | 4 holdout pts × 5k × 500 steps complete (~175 min on A30) | Job 54413476; E032 ep127 snapshot; 4 × ~49 MB NPZ at infer_holdout_e2e_hpc3/; stage-1 generates full 8-dim event vector |
 | A020 | 2026-07-21 | inference (e2e) | `bsm_grid_event_c_layers4_mpi/infer_holdout_e2e` | 4 BSM holdout pts × 5k events complete | Job 56205478; E031 epoch 34 ckpt (val_loss=5.279); MPI-on data; plots at `plots_a020_e2e/` |
 | A017-t | 2026-07-19 | inference (e2e) | `sm_5proc_event_c_stage1/infer_holdout_e2e_10k_ep153` | 4 procs × 10k events complete (~315 MB) | Job 56067378; E030 epoch 153; stage-1 → stage-2 e2e; no truth bypass |
 | A017 | 2026-07-19 | inference (e2e) | `sm_4proc_event_c_layers4_full/infer_holdout_e2e_10k_ep178` | 4 procs × 10k events complete (~315 MB) | Job 56067377; E029 epoch 178; stage-1 generates log_npart; truth event features still injected (layers4 design) |
@@ -81,6 +90,262 @@ Last updated: 2026-07-21 (A020 e2e completed; A020-t/A021/A021-s1/A021-t queued;
 ## Experiment details
 
 (Most recent first.)
+
+---
+
+### E034 — CFG training and inference for cone mass conditioning (bsm_grid_event_c_stage1_cfg)
+
+- **Date staged:** 2026-08-01
+- **Type:** Training + inference
+- **Cluster:** HPC3
+- **Run name:** `bsm_grid_event_c_stage1_cfg`
+- **Hypothesis:** Training stage 2 with cone mass conditioning dropout (CFG training), then using two-pass CFG at inference, will give stronger control over cone mass generation. The model learns to be sensitive to cone mass conditioning, and inference-time guidance steers particles more strongly toward matching stage 1's sampled values.
+- **Setup:**
+  - Architecture: Identical to E023 (num_gen_layers=2, standard cross-attention on parton+event tokens). No new layers or parameters added.
+  - Training change: During `train_step`, each event independently has cone mass features zeroed (indices 4 and 6 of the 7-dim `input_event`: log1p_cone_mass_X and log1p_cone_mass_Y) with probability 0.15. All other features (MET, cone pTs, log_npart) are always present. Null value = 0.0 in normalized space (= training mean).
+  - Inference: Two-pass CFG. At each denoising step, model runs twice — once conditional (cone masses from stage 1), once null (cone mass indices zeroed). Combined as `v_guided = v_null + s × (v_cond - v_null)`. Doubles per-step compute.
+  - Validation: `test_step` uses full conditioning (no dropout) → val_loss is comparable to E023.
+- **Training metrics:**
+  - `cfg_drop`: fraction of training events with cone mass dropped per batch (~0.15 at convergence).
+  - `loss`, `part`, `jet`: unchanged from E023 structure.
+- **Inference CLI:**
+  - `--guidance_scale` (float, default 1.0): CFG guidance scale. 1.0 = conditional, 0.0 = unconditional, >1.0 = extrapolation.
+  - `--use_true_cone` (flag): use truth cone masses instead of stage-1 predictions for conditional pass.
+- **Scripts:**
+  - Architecture: `scripts/PET_pp_parton_vpar_bsm_event_c_stage1_cfg.py`
+  - Training: `scripts/bsm_grid_train_event_c_stage1_cfg.py`
+  - Inference: `scripts/infer_bsm_grid_event_c_stage1_cfg.py`
+  - Diagnostics: `scripts/eval_cone_mass_w1.py` (stage-1 cone mass W₁), `scripts/eval_stage2_cone_mass.py` (stage-2 cone mass, truth-cond)
+  - Submit: `submit/submit_e034_hpc3_train.sh`, `submit/submit_e034_hpc3_infer_e2e.sh`, `submit/submit_e034_hpc3_infer_truth.sh`, `submit/submit_e034_hpc3_plot.sh`, `submit/submit_eval_stage2_cone_mass.sh`
+- **Checkpoint dir:** `/pub/lcondren/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_stage1_cfg/`
+- **Stats file:** `{ckpt_dir}/normalisation_stats_event_c_stage1_cfg.json` (same format as E023; auto-computed on first run)
+- **Hyperparameters:** Same as E023/E032 — lr=3e-4, lr_body=1e-4, epoch=200, batch=128, proj_dim=128, num_layers=8, num_gen_layers=2, num_jet_mlp=512, num_part=500, patience=30. cfg_dropout_prob=0.15.
+- **Smoke test:** Passed (2026-08-01, CPU login node, tiny model).
+  - 2 epochs, 192 events. `cfg_drop` = 0.156/0.182 per epoch (consistent with 0.15 target).
+  - val_loss 12.50 → 9.83 (finite and decreasing; higher than E023 due to tiny untrained model).
+  - CFG math verified: guidance_scale=1.0 → output equals v_cond exactly; guidance_scale=0.0 → output equals v_null exactly.
+  - DDPMSamplerCFG runs without error at all tested guidance scales.
+- **Training progress (as of 2026-08-05):**
+  - Epoch 42/200, val_loss=4.975 (part+jet; stable and consistent with E023 baseline)
+  - `cfg_drop` tracking confirmed at ~0.15 throughout
+  - Stage-1 cone mass W₁ (eval_cone_mass_w1.py at ep20): ~0.09 — matches E023 ep200 baseline
+  - Stage-2 cone mass W₁ (eval_stage2_cone_mass.py at ep42, truth-cond): mean ~0.019 X, 0.019 Y — strong result at only ep42
+- **Interim inference results (A027t, epoch 42, truth-conditioned):**
+  - Full plot suite complete; generated distributions well-centered on truth masses at all 4 holdout points
+  - Particle distributions, global observables, jet observables, jet images, parton cone: all look excellent
+  - Artifact: https://claude.ai/code/artifact/36bfa564-051f-433d-8870-8924bfa171fb
+- **Relationship to other experiments:**
+  - E023: base model; identical architecture; no dropout, no guidance. E034 should produce better cone mass control at guidance_scale > 1.0.
+  - E033: alternative approach (per-parton locality routing); fully independent hypothesis.
+  - E032: E023's MPI-trained version (same architecture, more data).
+- **Diagnostic plan after training:**
+  1. Run holdout inference at guidance_scale ∈ {0.0, 1.0, 1.5, 3.0, 5.0, 7.5}.
+  2. Plot cone mass distributions per mass point — does separation improve with guidance_scale?
+  3. Compute W1(cone_mass_gen, cone_mass_truth) vs guidance_scale — optimal scale?
+  4. Recompute r(coneM_truth, coneM_gen) and r(LL_total, coneM_truth) vs guidance_scale.
+  5. Rerun posterior inference at multiple guidance scales — does LL surface show structure?
+- **Slurm job:** 55030598 (running), 55031907 (queued); self-resubmitting chain
+- **Submit script:** `submit/submit_e034_hpc3_train.sh`
+- **Status:** RUNNING — epoch 42/200
+- **Linked experiments:** E023 (base architecture), E032 (MPI variant), E033 (independent alternative), A025/A026t (diagnostic motivation), A027t/A027 (interim inference)
+
+---
+
+### A027 — E034 epoch 42 end-to-end inference with CFG (guidance_scale=1.5)
+
+- **Date submitted:** 2026-08-05
+- **Type:** Inference (E2E, two-pass CFG)
+- **Cluster:** HPC3
+- **Goal:** First E2E CFG inference for E034 — stage-1 generates cone mass predictions, stage-2 guided at guidance_scale=1.5. Evaluate whether CFG guidance visibly improves cone mass separation vs E032 baseline at similar epoch count.
+- **Model:** E034 `bsm_grid_event_c_stage1_cfg`, epoch 42. Two-pass CFG: `v_guided = v_null + 1.5 × (v_cond - v_null)`.
+- **Settings:** n_total=2000, num_steps=500, chunk_size=50, guidance_scale=1.5. 4 GPUs in parallel (one mass point each).
+- **Output dir:** `bsm_grid_event_c_stage1_cfg/infer_holdout_e2e/`
+- **Slurm job:** 55033664 (RUNNING); plot job 55033666 chained (afterok)
+- **Scripts:** `scripts/infer_bsm_grid_event_c_stage1_cfg.py`, `submit/submit_e034_hpc3_infer_e2e.sh`, `submit/submit_e034_hpc3_plot.sh`
+- **Status:** RUNNING
+- **Linked experiments:** E034 (training source), A027t (truth-cond complement)
+
+---
+
+### A027t — E034 epoch 42 truth-conditioned inference
+
+- **Date completed:** 2026-08-05
+- **Type:** Inference (truth-conditioned; stage-2 only)
+- **Cluster:** HPC3
+- **Goal:** Interim diagnostic of stage-2 generation quality for E034 at epoch 42, bypassing stage-1 entirely. Establishes a ceiling for what CFG can achieve — if truth-cond results are good, the question shifts to how well stage-1 + CFG guidance can approach them.
+- **Method:** `--use_truth_jet --use_true_event` — truth log_npart and truth event features (MET, cone_pT/mass_X/Y) injected directly into stage-2. Single pass (no CFG; guidance not meaningful with truth conditioning).
+- **Settings:** n_total=2000, num_steps=500, chunk_size=50. 4 GPUs in parallel.
+- **Output dir:** `bsm_grid_event_c_stage1_cfg/infer_holdout_truth/`
+- **Plot dir:** `bsm_grid_event_c_stage1_cfg/plots_truth_ep42/`
+- **Slurm jobs:** inference 55033665, plot 55040649
+- **Scripts:** `scripts/infer_bsm_grid_event_c_stage1_cfg.py`, `submit/submit_e034_hpc3_infer_truth.sh`, `submit/submit_e034_hpc3_plot.sh`
+- **Status:** COMPLETE
+- **Results:** Plots look excellent. Generated particle distributions, global observables, jet observables, jet images, and parton cone observables all closely match truth at all 4 holdout mass points. Stage-2 at epoch 42 is clearly learning mass-dependent cone structure when given correct event-level conditioning. Mean rel-W₁ for cone masses: ~0.019 (X) / 0.019 (Y) at 500 events per point.
+- **Artifact:** https://claude.ai/code/artifact/36bfa564-051f-433d-8870-8924bfa171fb
+- **Linked experiments:** E034 (training source), A027 (E2E counterpart)
+
+---
+
+### E033 — Per-parton mass conditioning with locality bias (bsm_grid_event_c_locality)
+
+- **Date submitted:** 2026-07-26
+- **Type:** Training
+- **Cluster:** HPC3
+- **Goal:** Fix stage-2's failure to use cone mass conditioning. A024/A025 showed stage-1 generates cone mass targets with 88–150% of truth separation, but stage-2 collapses them to 11–39%. The root cause: stage-2 receives cone_mass_X/Y as part of a single global 7-dim event token, giving no spatial structure to determine which particles should be mass-sensitive. E033 replaces that global token with two per-parton mass tokens — one for the X decay and one for the Y decay — with a locality gate that makes the conditioning stronger for particles near the corresponding parton direction.
+- **Architecture changes vs E032:**
+  - `scripts/PET_pp_parton_vpar_bsm_event_c_locality.py`: new `_build_locality_generator_head()` replaces the global event token with two per-parton mass tokens (cone_mass_X, cone_mass_Y). Each token built from parton direction features (sinφ, cosφ, β_z) + cone mass, projected to dim D. Cross-attention per generator layer split into three streams: (a) standard MHA to 4 parton tokens, (b) MHA to mass-X token × gate_X, (c) MHA to mass-Y token × gate_Y. Gate = sigmoid(Dense(1)(concat([x2n, rel_pos]))) where rel_pos is the particle's (η, sinφ) offset from the parton direction. External train/test step API unchanged.
+  - Stage-1 ResNet identical to E032.
+- **Data / stats:** Same as E032 — `/pub/lcondren/wprime_signal_mpi/`. Stats reused from `normalisation_stats_event_c_stage1.json` (8-dim format unchanged).
+- **Scripts:**
+  - Architecture: `scripts/PET_pp_parton_vpar_bsm_event_c_locality.py`
+  - Training: `scripts/bsm_grid_train_event_c_locality.py`
+  - Submit: `submit/submit_e033_hpc3_train.sh` (self-resubmitting)
+- **Checkpoint dir:** `/pub/lcondren/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_locality/`
+- **Slurm job:** 55032818 (running), 55032819 (queued); restarted 2026-08-05 after chain break
+- **Hyperparameters:** Identical to E032 — lr=3e-4, lr_body=1e-4, epoch=200, batch=32, proj_dim=128, num_layers=8, num_gen_layers=2, num_jet_mlp=512, num_part=500, patience=30.
+- **Smoke test:** Passed (2026-07-26, CPU, 2 epochs, 200 events). Loss 19.8→10.1 (train), 13.7→8.0 (val). No shape errors, no crashes.
+- **Chain-break incident (2026-08-05):** Self-resubmitting chain stopped at epoch 105 due to `Argument list too long` (ARG_MAX). Root cause: `export LD_LIBRARY_PATH=...:${LD_LIBRARY_PATH:-}` in the submit script accumulated the inherited value on each job iteration — after ~100 chains the variable exceeded the OS ARG_MAX limit and every process in the script (including `python3`, `sbatch`, `date`) failed. Fix: removed `${LD_LIBRARY_PATH:-}` so LD_LIBRARY_PATH is set fresh each job. Same fix applied to `submit_e034_hpc3_train.sh`.
+- **Status:** RUNNING — epoch 105/200, val_loss=5.021; restarted and chained
+- **Next step:** After ~150 epochs, run inference to check cone mass separation. Compare vs E034 (CFG) — which approach better recovers mass-dependent structure?
+- **Linked experiments:** E032 (baseline architecture), A024/A025 (diagnostic motivation), A026t (truth-cond diagnostic confirming stage-2 is the bottleneck)
+
+---
+
+### A026t — E032 ep127 truth-conditioned inference on HPC3 (stage-2 diagnostic)
+
+- **Date submitted:** 2026-07-26
+- **Type:** Inference (truth-conditioned; stage-2 only)
+- **Cluster:** HPC3
+- **Goal:** Determine whether poor cone mass separation in A024/A025 is a stage-1 failure (stage-1 generates wrong cone mass targets) or an intrinsic stage-2 failure (stage-2 doesn't learn mass-dependent structure even when given correct targets). By injecting truth event features directly into stage-2, stage-1 is bypassed entirely. If cone masses separate well in the output, the problem is stage-1. If they still collapse, it is stage-2.
+- **Method:** `--use_truth_jet --use_true_event` — sets `jets_in = jet_truth` (truth log_npart, MET, cone_pT/mass_X/Y), bypassing all stage-1 generation. Stage-2 diffusion generates the particle cloud conditioned on truth event features.
+- **Model:** E032 `bsm_grid_event_c_stage1_mpi`, ep127 snapshot. num_gen_layers=2, num_jet_mlp=512.
+- **Checkpoint:** `/pub/lcondren/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_stage1_mpi_snap_e127/pet_pp.weights.h5`
+- **Slurm job:** 54529102 (1 node, 4 GPUs; 4 mass points in parallel)
+- **Submit script:** `submit/submit_a026t_e032_infer_truth_hpc3.sh`
+- **Settings:** n_total=5000, num_steps=500, chunk_size=50, npart=500
+- **Output dir:** `bsm_grid_event_c_stage1_mpi_snap_e127/infer_holdout_truth_hpc3/`
+- **Status:** RUNNING
+- **Next step:** Run A025 diagnostic (`plot_mass_overlay_diagnostic.py`) on the truth-conditioned NPZs and compare cone mass separation against A025 (e2e) results. If separation recovers to ≥70% of truth, stage-1 is the bottleneck → train longer or improve stage-1. If it stays at 17–38%, stage-2 is the bottleneck → fix_cone_mass post-processing or architectural changes.
+- **Linked experiments:** A024 (e2e counterpart), A025 (mass-discriminability diagnostic on e2e outputs), E032 (training source)
+
+---
+
+### A025 — Mass-discriminability diagnostic: jet mass and cone mass overlay
+
+- **Date:** 2026-07-26
+- **Type:** Diagnostic (CPU, login node)
+- **Goal:** Check whether the E032 epoch-127 model encodes mass-dependent kinematic structure. If the generated cone-mass and jet-mass distributions separate across the 4 holdout mass points the same way truth does, the model has learned mass-conditioning. If they don't separate (all 4 mass points pile up), that explains the flat A022 ELBO posterior.
+- **Input:** `infer_holdout_e2e_fixmet/` NPZs (A024 with fix_met applied), 2000 events per mass point.
+- **Observables:**
+  - Parton-cone invariant mass: R=0.4 cone around parton slot 2 (X decay, should peak near m_X) and slot 3 (Y decay, should peak near m_Y). Compared truth vs generated for all 4 mass points overlaid.
+  - Anti-kT R=0.4 jet mass: leading and subleading jets (pT > 20 GeV), truth vs generated overlaid.
+- **Script:** `scripts/plot_mass_overlay_diagnostic.py`
+- **Output:** `bsm_grid_event_c_stage1_mpi_snap_e127/diag_mass_overlay/diag_cone_mass_overlay.png`, `diag_jet_mass_overlay.png`
+- **Status:** COMPLETE
+- **Results:**
+
+  | Observable | Truth separation | Gen separation | Gen/Truth |
+  |---|---|---|---|
+  | Cone X (slot 2, m_X) | ~21 GeV | ~8 GeV | 38% |
+  | Cone Y (slot 3, m_Y) | ~18 GeV | ~3 GeV | 17% |
+
+  Mean cone-X: truth 214/235 GeV for m_X=250/300; gen 193/202 GeV (same groups — compressed, shifted low). Mean cone-Y: truth 216/234 GeV for m_Y=250/300; gen 208/211 GeV (barely separates — 3 GeV vs 18 GeV in truth).
+
+- **Interpretation:** The model at epoch 127/200 has not yet learned to encode mass-dependent cone structure with full fidelity. Cone-Y discrimination is especially poor (17% of truth separation). This directly explains the flat ELBO posterior in A022: the velocity field barely changes as a function of mass hypothesis, so scoring truth particles under different conditioning gives nearly identical scores. Expected to improve as E032 continues training toward epoch 200.
+- **Artifact:** https://claude.ai/code/artifact/44fe7e28-b3e6-4e2a-a959-92a9e6ca0a9b
+
+---
+
+### A024-fixmet — MET post-processing applied to A024 inference outputs
+
+- **Date:** 2026-07-26
+- **Type:** Post-processing + re-plotting
+- **Goal:** Apply the `fix_met` momentum correction to the A024 generated particle clouds, then re-run the full plot suite to see how observable distributions change.
+- **Method:** `scripts/apply_fix_met.py` loads each A024 NPZ, applies uniform MET correction (same logic as `--fix_met` in `infer_bsm_grid_event_c_stage1.py`), and saves corrected NPZs. Correction uses stage-1 predicted MET from `jets_gen[:, 1:4]` with normalisation from `normalisation_stats_event_c_stage1.json`.
+- **Results:**
+  - MET residual before: ~35 GeV across all 4 mass points
+  - MET residual after: <0.002 GeV (sub-MeV precision)
+  - Particles skipped (corrected pT < 10 MeV): 9–16 per mass point out of ~2.5M total
+- **Outputs:**
+  - Corrected NPZs: `infer_holdout_e2e_fixmet/bsm_mX*_mY*_rank00_of01.npz`
+  - Plots: `plots_a024_e2e_fixmet/` (same 14 PNGs as A024)
+  - Gallery artifact: https://claude.ai/code/artifact/3f642400-cb48-4c3c-8b4b-691cc0b085d0
+- **Scripts added:**
+  - `scripts/apply_fix_met.py` — standalone post-processor for existing NPZ files
+  - `--fix_met` flag added to `scripts/infer_bsm_grid_event_c_stage1.py` — applies correction inline during future inference runs
+- **Trade-off:** Same as E024 — uniform correction slightly smears per-particle log_pT (expected ~3.6× W₁ degradation based on E024 results); cone and jet observables largely unaffected.
+- **Status:** COMPLETE
+
+---
+
+### A024 — E032 stage-1 end-to-end inference on 4 BSM holdout points (ep127)
+
+- **Date submitted:** 2026-07-24
+- **Type:** Inference (end-to-end generative)
+- **Cluster:** HPC3
+- **Goal:** Generate synthetic particle-level events at each of the 4 heldout W' mass points using the E032 (stage-1) model at epoch 127. Stage-1 first generates the full 8-dim event vector [log_npart, log1p(MET), sin(MET_phi), cos(MET_phi), log1p(cone_pT_X), log1p(cone_mass_X), log1p(cone_pT_Y), log1p(cone_mass_Y)] from the parton conditioning; stage-2 then uses those generated event features to produce the particle cloud. This is the fully generative pipeline — no truth event features injected at inference.
+- **Model:** E032 `bsm_grid_event_c_stage1_mpi`, num_gen_layers=2, num_jet_mlp=512, num_jet=8. Epoch-127 snapshot used to avoid race with ongoing training writes.
+- **Checkpoint:** `/pub/lcondren/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_stage1_mpi_snap_e127/pet_pp.weights.h5`
+- **Slurm job:** 54413476 (1 node, 4 GPUs; 4 mass points in parallel, one per GPU)
+- **Scripts:**
+  - Inference: `scripts/infer_bsm_grid_event_c_stage1.py`
+  - Submit: `submit/submit_a024_e032_infer_e2e.sh`
+- **Settings:** n_total=5000 events per mass point, num_steps=500, chunk_size=50, npart=500
+- **Output:** `/pub/lcondren/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_stage1_mpi_snap_e127/infer_holdout_e2e_hpc3/bsm_mX{XXXX}_mY{YYYY}_rank00_of01.npz`
+- **Status:** COMPLETE — all 4 NPZ files written, ~175 min total on an A30 node (4 mass points in parallel, ~2097 ms/event)
+- **Note:** chunk_size reduced from 200→50 vs original NERSC scripts; required because HPC3 free-gpu nodes may allocate V100-16GB (vs A30-24GB used for training). First attempt (chunk_size=200) OOMed on a V100 node. Successful run landed on hpc3-gpu-k54-02 (A30).
+- **Plan:** Compare generated observable distributions (particle pT/η spectra, multiplicity, MET, cone masses) against Pythia truth at each heldout mass point. Compare with A020 (E031 layers4 e2e) to evaluate whether the richer stage-1 (8-dim joint generation) produces better event-level features than the simpler log_npart-only stage-1.
+- **Linked experiments:** E032 (training source), A021 (prior e2e on NERSC at epoch 95), A020 (E031 companion for architecture comparison)
+
+---
+
+### A022 — W' mass posterior inference via diffusion ELBO scoring (first parameter estimation run)
+
+- **Date submitted:** 2026-07-24
+- **Type:** Mass posterior inference (parameter estimation)
+- **Cluster:** HPC3 (all prior experiments ran on NERSC; this is the first HPC3 inference job)
+- **Goal:** First test of using the trained diffusion model to infer W' mass parameters from particle-level observables. For each of the 4 heldout mass points, score observed events against all 144 mass hypotheses on the grid using the ELBO likelihood estimate, then check whether the argmax recovers the true mass.
+- **Method:** For each observed event x and mass hypothesis θ = (m_X, m_Y), estimate log p(x | θ) via Monte Carlo over diffusion timesteps:
+  ```
+  score(x, θ) = -mean_{t~U[0,1]} [ ||v_θ(x_t, t | cond(θ)) - v_true||² / n_particles ]
+              + -mean_{t~U[0,1]} [ ||v_θ^jet(jet_t, t | cond(θ)) - v_true^jet||² ]
+  ```
+  where v_true = alpha_t * eps - sigma_t * x, x_t = alpha_t * x + sigma_t * eps, and the expectation is approximated with n_t MC timestep samples per event. Scores are averaged over all observed events. Lower total score = higher estimated likelihood. Both the particle term (EMA body + head) and jet multiplicity term (EMA jet) are included.
+- **Conditioning:** cond(θ) uses the truth parton kinematics from the observed events (fixed) with the hypothesized mass injected into parton slots 2 (m_X/600) and 3 (m_Y/600). This tests mass discriminability given known parton kinematics.
+- **Checkpoint:** E031 epoch 54/200, val_loss=5.279. Snapshotted before job submission to avoid race with ongoing training epoch saves → `/pub/lcondren/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_layers4_mpi_snap_e054/pet_pp.weights.h5`
+- **Observed data:** Validation slice of each heldout file (rows 80000–80500, 500 events); these events were never seen during training.
+- **Jobs:**
+
+  | Slurm job | Observed mass | Status |
+  |-----------|--------------|--------|
+  | 54413538  | m_X=250, m_Y=250 | TIMED OUT at hyp 103/144 on V100 node (hpc3-gpu-16-03); ~2.33 min/hyp × 144 = ~335 min needed |
+  | 54413539  | m_X=250, m_Y=300 | COMPLETE — 173.6 min, `posterior_mX250_mY300.npz` |
+  | 54413540  | m_X=300, m_Y=250 | COMPLETE — 180.3 min, `posterior_mX300_mY250.npz` |
+  | 54413541  | m_X=300, m_Y=300 | COMPLETE — 174.6 min, `posterior_mX300_mY300.npz` |
+  | **54491919** | **m_X=250, m_Y=250** | **COMPLETE — resubmitted 2026-07-26 with n_t=25** |
+
+- **Previous attempt (first timeout):** Jobs 54412002–54412005 hit the 4-hour wall time after completing only 12–14 of 144 hypotheses (~17 min/hypothesis at n_obs=2000, n_t=200). ETA at cancellation was ~37–43 hours total.
+- **Scripts:**
+  - Scoring: `scripts/infer_bsm_mass_posterior.py` (written 2026-07-24; supports both layers4 and stage-1 via --num_jet arg)
+  - Submit: `submit/submit_e031_mass_infer.sh`
+- **Output:** `/pub/lcondren/wprime_signal_mpi/mass_inference_e031_e054/posterior_mX{N}_mY{N}.npz` — arrays: `mass_x`, `mass_y`, `mean_log_likelihood`, `part_scores`, `jet_scores`, `total_scores` (one value per grid hypothesis)
+- **Settings:** n_obs=500, n_t=25 (reduced from 50 after V100 timeout on mX=250 mY=250), chunk=200, npart=500, num_gen_layers=4, proj_dim=128, num_layers=8
+- **Expected runtime:** ~85 min on A30 / ~167 min on V100 (with n_t=25)
+- **Status:** COMPLETE — all 4 mass points scored.
+- **Results:**
+
+  | True mass | Argmax | Rank / 144 | ΔLL | LL range |
+  |-----------|--------|-----------|-----|---------|
+  | (250, 250) | (300, 200) | 6 (top 4%) | 0.0032 | 0.332 |
+  | (250, 300) | (150, 400) | 5 (top 3%) | 0.0185 | 0.321 |
+  | (300, 250) | (450, 200) | 10 (top 7%) | 0.0163 | 0.355 |
+  | (300, 300) | (450, 200) | 50 (top 35%) | 0.0313 | 0.441 |
+
+- **Interpretation:** Argmax does not recover the true mass for any of the 4 points. The posterior is nearly flat (range ~0.33–0.44 nats across 144 hypotheses). True mass ranks 5–50/144 — better than random (median 72), indicating weak but real mass signal at epoch 54. ΔLL between true and argmax is 0.003–0.031 — within Monte Carlo noise at n_t=25. Repeat at later checkpoints to track sharpening.
+- **Plots:** `mass_inference_e031_e054/posterior_heatmaps.png`, `posterior_profiles.png`. Artifact: https://claude.ai/code/artifact/328590f1-0de7-4ebb-ab68-82ca84ed9ff2
+- **Diagnosis:** Posterior flatness is likely caused by the model not yet encoding mass-dependent jet substructure (cone mass, jet mass) at epoch 54/200. A025 diagnostic will check whether generated distributions separate across mass points the way truth does.
+- **Plan:** Repeat at E031 epoch 100, 150, 200 to track posterior sharpening.
+- **Linked experiments:** E031 (training source), A020 (prior e2e inference on same model/data)
 
 ---
 

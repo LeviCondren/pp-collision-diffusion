@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""BSM grid inference — E023: stage-1 generates 8-dim event vector.
+"""BSM grid inference — E034: two-pass CFG for cone mass conditioning.
 
-Copied from infer_bsm_grid_event_c.py (E020c) and modified for E023:
-  - Loads combined 8-dim stats from normalisation_stats_event_c_stage1.json.
-  - Stage 1 generates [log_npart, event_feat[0..6]] jointly.
-  - --use_true_event: bypass stage-1 event features; use truth instead.
-  - --num_jet_steps: DDPM steps for stage-1 sampler.
-  - jets_gen is (N, 8); col 0 = log_npart, cols 1-7 = event features.
+Copied from infer_bsm_grid_event_c_stage1.py (E023) and modified for E034:
+  - Loads combined 8-dim stats from normalisation_stats_event_c_stage1_cfg.json.
+  - Default run_name: bsm_grid_event_c_stage1_cfg.
+  - Two-pass CFG inference: stage-2 runs twice per denoising step with and
+    without cone mass conditioning; combined as:
+      v_guided = v_null + guidance_scale * (v_cond - v_null)
+  - --guidance_scale: CFG guidance strength (default 1.0 = conditional pass).
+  - --use_true_cone: use truth cone masses instead of stage-1 predictions.
+  - Uses model.generate_cfg() from PET_pp_parton_vpar_bsm_event_c_stage1_cfg.
 
-Do NOT modify the original infer_bsm_grid_event_c.py (E020c canonical).
+Do NOT modify the original infer_bsm_grid_event_c_stage1.py (E023 canonical).
+
+Changelog:
+  E034 (2026-08-01): two-pass CFG inference for cone mass conditioning.
 """
 
 import os, sys, re, json, argparse, glob, time
@@ -30,10 +36,10 @@ def _parse():
     p.add_argument('--m_Y',              type=float, required=True)
     p.add_argument('--grid_dir',         default=_GRID_DIR_DEFAULT)
     p.add_argument('--ckpt_dir',         default=None)
-    p.add_argument('--run_name',         default='bsm_grid_event_c_stage1')
+    p.add_argument('--run_name',         default='bsm_grid_event_c_stage1_cfg')
     p.add_argument('--stats_path',       default=None,
                    help='Combined 8-dim stats JSON '
-                        '(default: {grid_dir}/normalisation_stats_event_c_stage1.json)')
+                        '(default: {ckpt_dir}/normalisation_stats_event_c_stage1_cfg.json)')
     p.add_argument('--out_dir',          default=None)
     p.add_argument('--rank',             type=int,
                    default=int(os.environ.get('SLURM_ARRAY_TASK_ID', 0)))
@@ -53,6 +59,11 @@ def _parse():
                    help='Use truth event features for stage 2 (bypasses stage-1 event output)')
     p.add_argument('--num_jet_steps',   type=int, default=None,
                    help='DDPM steps for stage-1 sampler (default: 512)')
+    p.add_argument('--guidance_scale',  type=float, default=1.0,
+                   help='CFG guidance scale s in v_null + s*(v_cond - v_null). '
+                        '1.0=conditional, 0.0=unconditional, >1.0=extrapolation.')
+    p.add_argument('--use_true_cone',   action='store_true', default=False,
+                   help='Use truth cone masses for conditional pass (bypasses stage-1 cone mass)')
     p.add_argument('--num_jet_mlp',     type=int, default=512)
     p.add_argument('--stage1_only',     action='store_true', default=False,
                    help='Run only stage-1 (event feature generation); skip particle generation')
@@ -94,7 +105,7 @@ print(f'[rank {args.rank}/{args.world_size}] CUDA_VISIBLE_DEVICES={_gpu_id}  '
 grid_dir   = args.grid_dir
 ckpt_dir   = args.ckpt_dir or os.path.join(grid_dir, 'checkpoints_bsm_grid')
 stats_path = (args.stats_path
-              or os.path.join(ckpt_dir, 'normalisation_stats_event_c_stage1.json'))
+              or os.path.join(ckpt_dir, 'normalisation_stats_event_c_stage1_cfg.json'))
 ckpt_path  = os.path.join(ckpt_dir, args.run_name, 'pet_pp.weights.h5')
 out_dir           = args.out_dir or os.path.join(ckpt_dir, args.run_name, 'infer')
 os.makedirs(out_dir, exist_ok=True)
@@ -337,7 +348,7 @@ print(f'[rank {args.rank}] mean truth npart={mask_truth.sum(axis=1).mean():.1f}'
 
 _scripts = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _scripts)
-from PET_pp_parton_vpar_bsm_event_c_stage1 import PET_pp_parton_vpar_bsm_event_c_stage1
+from PET_pp_parton_vpar_bsm_event_c_stage1_cfg import PET_pp_parton_vpar_bsm_event_c_stage1
 
 if not os.path.exists(ckpt_path):
     raise FileNotFoundError(f'Checkpoint not found: {ckpt_path}')
@@ -394,18 +405,37 @@ if args.stage1_only:
         jets_gen         = jets_gen,   # (N, 8): col0=log_npart, cols1-7=event
     )
 else:
-    parts_gen, jets_gen = model.generate(
-        cond=cond,
-        jet_mean=jet_mean,
-        jet_std=jet_std,
-        event_feat=event_feat,
-        nsplit=nsplit,
-        num_steps=args.num_steps,
-        jets=jets_in,
-        use_tqdm=True,
-        num_jet_steps=args.num_jet_steps,
-        use_true_event=args.use_true_event,
-    )
+    print(f'[rank {args.rank}] CFG guidance_scale={args.guidance_scale}  '
+          f'use_true_cone={args.use_true_cone}  use_true_event={args.use_true_event}')
+
+    if args.use_true_event:
+        # Standard (non-CFG) generation with truth event features; ignore guidance_scale
+        parts_gen, jets_gen = model.generate(
+            cond=cond,
+            jet_mean=jet_mean,
+            jet_std=jet_std,
+            event_feat=event_feat,
+            nsplit=nsplit,
+            num_steps=args.num_steps,
+            jets=jets_in,
+            use_tqdm=True,
+            num_jet_steps=args.num_jet_steps,
+            use_true_event=True,
+        )
+    else:
+        parts_gen, jets_gen = model.generate_cfg(
+            cond=cond,
+            jet_mean=jet_mean,
+            jet_std=jet_std,
+            nsplit=nsplit,
+            jets=jets_in,
+            use_tqdm=True,
+            num_steps=args.num_steps,
+            num_jet_steps=args.num_jet_steps,
+            guidance_scale=args.guidance_scale,
+            use_true_cone=args.use_true_cone,
+            event_feat=event_feat if args.use_true_cone else None,
+        )
     dt = time.perf_counter() - t1
     print(f'[rank {args.rank}] generated in {dt/60:.2f} min  ({dt/N*1000:.0f} ms/event)')
 
@@ -429,6 +459,7 @@ else:
         mass_y            = np.float32(file_my),
         event_feat_truth  = event_feat,
         jets_gen          = jets_gen,   # (N, 8): col0=log_npart, cols1-7=event
+        guidance_scale    = np.float32(args.guidance_scale),
     )
 print(f'[rank {args.rank}] saved → {out_file}')
 print(f'[rank {args.rank}] done in {(time.perf_counter()-t1)/60:.2f} min total')

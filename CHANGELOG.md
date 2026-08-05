@@ -6,6 +6,35 @@ Each entry records SHA-256 hashes so changes can be verified or reverted.
 
 ---
 
+## [2026-07-26] — E033: per-parton mass conditioning with locality bias (bsm_grid_event_c_locality)
+
+### Summary
+Replaced the global event token in stage-2's generator head with two per-parton mass tokens — one for the X decay (parton slot 2) and one for the Y decay (parton slot 3). Each mass token is built from the parton's direction features (sinφ, cosφ, β_z) concatenated with the predicted (or truth) cone mass for that decay. A learned sigmoid locality gate then scales each mass token's cross-attention contribution by the particle's proximity to the parton in normalised (η, sinφ) space, giving an explicit inductive bias: particles near parton slot 2 are more strongly influenced by cone_mass_X.
+
+Motivation: diagnostic A024 showed stage-1 predicts cone mass targets with 88–150% of truth separation, but stage-2 collapses them to 11–39% of truth. The locality gate gives stage-2 a stronger, spatially structured path to use the cone mass conditioning signal.
+
+Per generator layer, cross-attention is split into three independent streams: (a) standard MHA to all 4 parton tokens, (b) locality-gated MHA to the mass-X token, (c) locality-gated MHA to the mass-Y token. Outputs are summed before the residual connection. Stage-1 ResNet is unchanged. The external model_part call signature is unchanged; inputs_points (already the 2nd model_part input) is routed through to the head internally.
+
+### `scripts/PET_pp_parton_vpar_bsm_event_c_locality.py` — new file (copied from E032 arch)
+- SHA-256: `6486c9bc30017f1a13808f6146ea6af4edde6d19eef8c91716f15c6a3fdfcad9`
+- Classes: `PET_pp_parton_vpar_bsm_event_c_locality` and `WeightedBSMPET_event_c_locality`.
+- `_build_locality_generator_head()`: replaces `_build_vpar_generator_head()` from E032. New `inp_points = Input(shape=(None, 2))` feeds particle (η, sinφ) positions to the head.
+- Per-parton mass tokens: `cone_mass_X = inp_event[:, 4:5]`, `cone_mass_Y = inp_event[:, 6:7]`. Each token = Dense(D, gelu) → Dense(D) applied to `concat([parton_features[slot], cone_mass])`, expanded to `(N, 1, D)`.
+- Locality relative positions: `rel_X = concat([eta_part - eta_proxy_X, sphi_part - sphi_proxy_X])` where `eta_proxy_X = parton_tokens[:, 2:3, 3:4]` (β_z ≈ tanh η, monotone in η).
+- Gate: `gate_X = sigmoid(Dense(1)(concat([x2n, rel_X])))` per particle per layer.
+- `evaluate_models`: `points = x[:,:,:2]` extracted and passed to both body and head.
+- `model_part` wiring: adds `inputs_points` as the final head input; external train/test step API unchanged.
+- Parton attention mask: 4 partons only (no global event token); simplified to `attn_mask = cast(parton_mask_in[:, None, :], bool)`.
+
+### `scripts/bsm_grid_train_event_c_locality.py` — new file (copied from E032 training script)
+- SHA-256: `66ad9e4ff3cfe63330a856c5f444e22bf59f898fca67274eb9910669ef9bbaee`
+- Import: `from PET_pp_parton_vpar_bsm_event_c_locality import WeightedBSMPET_event_c_locality`.
+- Default `--run_name`: `bsm_grid_event_c_locality`.
+- Stats file: reuses `normalisation_stats_event_c_stage1.json` (data format and 8-dim jet layout are identical to E032).
+- Model instantiation changed to `WeightedBSMPET_event_c_locality`; all hyperparameters, data loading, and training loop identical to E032.
+
+---
+
 ## [2026-06-30] — E023: 8-dim stage-1 diffusion (bsm_grid_event_c_stage1)
 
 ### Summary

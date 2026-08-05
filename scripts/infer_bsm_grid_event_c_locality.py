@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""BSM grid inference — E023: stage-1 generates 8-dim event vector.
+"""BSM grid inference — E033: per-parton mass conditioning with locality bias.
 
-Copied from infer_bsm_grid_event_c.py (E020c) and modified for E023:
-  - Loads combined 8-dim stats from normalisation_stats_event_c_stage1.json.
-  - Stage 1 generates [log_npart, event_feat[0..6]] jointly.
-  - --use_true_event: bypass stage-1 event features; use truth instead.
-  - --num_jet_steps: DDPM steps for stage-1 sampler.
-  - jets_gen is (N, 8); col 0 = log_npart, cols 1-7 = event features.
+Copied from infer_bsm_grid_event_c_stage1.py (E032) with three changes:
+  - Imports PET_pp_parton_vpar_bsm_event_c_locality instead of stage1.
+  - Default --run_name is bsm_grid_event_c_locality.
+  - Model instantiated as PET_pp_parton_vpar_bsm_event_c_locality.
+All other logic (stats, data loading, generate API) is identical to E032.
+Stats file reused: normalisation_stats_event_c_stage1.json.
 
-Do NOT modify the original infer_bsm_grid_event_c.py (E020c canonical).
+Do NOT modify infer_bsm_grid_event_c_stage1.py (E032 canonical).
 """
 
 import os, sys, re, json, argparse, glob, time
@@ -30,7 +30,7 @@ def _parse():
     p.add_argument('--m_Y',              type=float, required=True)
     p.add_argument('--grid_dir',         default=_GRID_DIR_DEFAULT)
     p.add_argument('--ckpt_dir',         default=None)
-    p.add_argument('--run_name',         default='bsm_grid_event_c_stage1')
+    p.add_argument('--run_name',         default='bsm_grid_event_c_locality')
     p.add_argument('--stats_path',       default=None,
                    help='Combined 8-dim stats JSON '
                         '(default: {grid_dir}/normalisation_stats_event_c_stage1.json)')
@@ -58,6 +58,11 @@ def _parse():
                    help='Run only stage-1 (event feature generation); skip particle generation')
     p.add_argument('--fix_met',         action='store_true', default=False,
                    help='Post-process particles to match stage-1 predicted MET magnitude and phi')
+    p.add_argument('--time_budget_hours', type=float, default=None,
+                   help='Soft wall-time budget (hours) for generation; saves partial '
+                        'checkpoint and resubmits via sbatch when exhausted.')
+    p.add_argument('--submit_script',   default=None,
+                   help='Absolute path to the submit script for auto-requeue via sbatch.')
     return p.parse_args()
 
 
@@ -337,12 +342,12 @@ print(f'[rank {args.rank}] mean truth npart={mask_truth.sum(axis=1).mean():.1f}'
 
 _scripts = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _scripts)
-from PET_pp_parton_vpar_bsm_event_c_stage1 import PET_pp_parton_vpar_bsm_event_c_stage1
+from PET_pp_parton_vpar_bsm_event_c_locality import PET_pp_parton_vpar_bsm_event_c_locality
 
 if not os.path.exists(ckpt_path):
     raise FileNotFoundError(f'Checkpoint not found: {ckpt_path}')
 
-model = PET_pp_parton_vpar_bsm_event_c_stage1(
+model = PET_pp_parton_vpar_bsm_event_c_locality(
     num_feat=6, num_jet=8,
     max_partons=MAX_PARTONS,
     parton_feat=PARTON_FEAT,
@@ -394,20 +399,113 @@ if args.stage1_only:
         jets_gen         = jets_gen,   # (N, 8): col0=log_npart, cols1-7=event
     )
 else:
-    parts_gen, jets_gen = model.generate(
-        cond=cond,
-        jet_mean=jet_mean,
-        jet_std=jet_std,
-        event_feat=event_feat,
-        nsplit=nsplit,
-        num_steps=args.num_steps,
-        jets=jets_in,
-        use_tqdm=True,
-        num_jet_steps=args.num_jet_steps,
-        use_true_event=args.use_true_event,
-    )
+    # ── Resumable chunked generation ──────────────────────────────────────────
+    import signal as _signal
+    from tqdm import tqdm as _tqdm
+
+    partial_path   = out_file.replace('.npz', '_partial.npz')
+    _resubmit_lock = os.path.join(out_dir, '.resubmit.lock')
+    # Clear any stale lock from a previous job on this out_dir
+    try:
+        os.remove(_resubmit_lock)
+    except FileNotFoundError:
+        pass
+
+    # Resume from partial checkpoint if one exists
+    n_done    = 0
+    jet_list  = []
+    part_list = []
+    if os.path.exists(partial_path):
+        _p    = np.load(partial_path)
+        n_done    = int(_p['n_chunks_done'])
+        jet_list  = [_p['jets_done']]
+        part_list = [_p['parts_done']]
+        print(f'[rank {args.rank}] Resuming: {n_done}/{nsplit} chunks done '
+              f'({len(jet_list[0])} events in partial)')
+
+    # Wall-time budget: prefer SLURM_JOB_END_TIME, fall back to --time_budget_hours
+    _budget_secs   = (args.time_budget_hours * 3600.0) if args.time_budget_hours else None
+    _job_end_epoch = int(os.environ.get('SLURM_JOB_END_TIME', 0))
+
+    def _secs_remaining():
+        if _job_end_epoch:
+            return _job_end_epoch - time.time()
+        if _budget_secs:
+            return _budget_secs - (time.perf_counter() - t1)
+        return float('inf')
+
+    # SIGUSR1 as a backup stop signal (e.g. from --signal=USR1@N in sbatch header)
+    _stop_flag = [False]
+    def _sigusr1(sig, frame):
+        _stop_flag[0] = True
+        print(f'[rank {args.rank}] SIGUSR1 — will stop after current chunk')
+    _signal.signal(_signal.SIGUSR1, _sigusr1)
+
+    # Pre-split all inputs; call generate() one chunk at a time for checkpoint control
+    splits      = np.array_split(cond,       nsplit)
+    ev_splits   = np.array_split(event_feat, nsplit)
+    jets_splits = np.array_split(jets_in, nsplit) if jets_in is not None else None
+    chunk_times = []
+
+    def _save_partial(n_total_done):
+        """Write a resumable checkpoint with all generated data so far."""
+        if n_total_done == 0:
+            return
+        np.savez_compressed(partial_path,
+            jets_done     = np.concatenate(jet_list),
+            parts_done    = np.concatenate(part_list),
+            n_chunks_done = np.int32(n_total_done),
+        )
+
+    def _maybe_resubmit():
+        """Atomically claim the resubmit slot and call sbatch (one rank wins)."""
+        if not args.submit_script:
+            return
+        try:
+            fd = os.open(_resubmit_lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+            import subprocess
+            subprocess.run(['sbatch', args.submit_script], check=True)
+            print(f'[rank {args.rank}] Resubmitted: {args.submit_script}')
+        except FileExistsError:
+            print(f'[rank {args.rank}] Another rank already called sbatch — skipping')
+
+    for i in _tqdm(range(n_done, nsplit), initial=n_done, total=nsplit,
+                   desc=f'[rank {args.rank}]'):
+        # Check time budget before starting each chunk
+        tr  = _secs_remaining()
+        avg = (sum(chunk_times[-5:]) / min(len(chunk_times), 5)) if chunk_times else 400.0
+        if tr < avg * 2.0 + 300 or _stop_flag[0]:
+            reason = ('SIGUSR1' if _stop_flag[0]
+                      else f'{tr/60:.0f} min left, ~{avg/60:.1f} min/chunk')
+            print(f'[rank {args.rank}] Stopping ({reason}) — saved {i}/{nsplit} chunks')
+            _save_partial(i)
+            _maybe_resubmit()
+            sys.exit(0)
+
+        t0 = time.perf_counter()
+        parts_i, jets_i = model.generate(
+            cond           = splits[i],
+            jet_mean       = jet_mean,
+            jet_std        = jet_std,
+            event_feat     = ev_splits[i],
+            nsplit         = 1,
+            num_steps      = args.num_steps,
+            jets           = jets_splits[i] if jets_splits else None,
+            use_tqdm       = False,
+            num_jet_steps  = args.num_jet_steps,
+            use_true_event = args.use_true_event,
+        )
+        jet_list.append(jets_i)
+        part_list.append(parts_i)
+        chunk_times.append(time.perf_counter() - t0)
+        _save_partial(i + 1)
+
     dt = time.perf_counter() - t1
     print(f'[rank {args.rank}] generated in {dt/60:.2f} min  ({dt/N*1000:.0f} ms/event)')
+
+    parts_gen = np.concatenate(part_list)
+    jets_gen  = np.concatenate(jet_list)
 
     log_npart_gen = jets_gen[:, 0] * jet_std + jet_mean
     npart_gen     = np.clip(np.round(np.exp(log_npart_gen)).astype(int), 1, args.npart)
@@ -430,5 +528,9 @@ else:
         event_feat_truth  = event_feat,
         jets_gen          = jets_gen,   # (N, 8): col0=log_npart, cols1-7=event
     )
+    if os.path.exists(partial_path):
+        os.remove(partial_path)
+        print(f'[rank {args.rank}] removed partial checkpoint')
+
 print(f'[rank {args.rank}] saved → {out_file}')
 print(f'[rank {args.rank}] done in {(time.perf_counter()-t1)/60:.2f} min total')
