@@ -311,6 +311,41 @@ horovodrun --gloo -np 1 python3 scripts/bsm_grid_train_event_c_stage1.py \
 
 ---
 
+### E034 — W' CFG cone mass, epoch 42 — **in progress**
+
+- **Architecture:** `PET_pp_parton_vpar_bsm_event_c_stage1_cfg` (`num_gen_layers=2`, `num_jet_mlp=512`, `num_jet=8`, `cfg_dropout_prob=0.15`)
+- **Training script:** `scripts/bsm_grid_train_event_c_stage1_cfg.py`
+- **Submit script:** `submit/submit_e034_hpc3_train.sh`
+- **HF directory:** `e034_wprime_cfg_ep42/`
+- **Checkpoint path:** `<grid_dir>/checkpoints_bsm_grid/bsm_grid_event_c_stage1_cfg/pet_pp.weights.h5`
+- **Stats files:**
+  - `normalisation_stats_event_c_stage1_cfg.json` → `<grid_dir>/checkpoints_bsm_grid/normalisation_stats_event_c_stage1_cfg.json`
+- **Data:** 144-point W' grid (MPI=on), holdout: (250,250), (250,300), (300,250), (300,300).
+- **What's new vs E032:** Stage-2 trained with classifier-free guidance (CFG) — cone mass features zeroed with prob=0.15 per event during training. At inference, a two-pass CFG denoiser combines conditional and null outputs: `v_guided = v_null + guidance_scale × (v_cond − v_null)`. Doubles per-step compute; use `--guidance_scale` to control (1.0 = conditional, >1.0 = extrapolated).
+- **Inference script:** `scripts/infer_bsm_grid_event_c_stage1_cfg.py`
+- **Resume training:**
+```bash
+export PYTHONPATH=/path/to/repo/scripts
+python3 scripts/bsm_grid_train_event_c_stage1_cfg.py \
+    --grid_dir <grid_dir> \
+    --ckpt_dir <grid_dir>/checkpoints_bsm_grid \
+    --run_name bsm_grid_event_c_stage1_cfg \
+    --val_start 80000 --n_train 20000 \
+    --epoch 200 --batch 128 --lr 3e-4 --lr_body 1e-4 \
+    --num_layers 8 --num_gen_layers 2 --proj_dim 128 --num_jet_mlp 512 \
+    --cfg_dropout_prob 0.15
+```
+- **Run inference (truth-conditioned):**
+```bash
+python3 scripts/infer_bsm_grid_event_c_stage1_cfg.py \
+    --grid_dir <grid_dir> --ckpt_dir <grid_dir>/checkpoints_bsm_grid \
+    --run_name bsm_grid_event_c_stage1_cfg \
+    --m_X 250 --m_Y 250 --n_total 2000 --num_steps 500 \
+    --use_truth_jet --use_true_event --gpu_id 0
+```
+
+---
+
 ## Experiments
 
 See [EXPERIMENTS.md](EXPERIMENTS.md) for the full ledger of all runs, results, and interpretations.
