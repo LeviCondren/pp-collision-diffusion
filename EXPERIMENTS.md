@@ -2,7 +2,7 @@
 
 Source of truth for what's running, what's done, and what each result means.
 
-Last updated: 2026-08-05 (E034 epoch 42/200 training; A027t truth-cond inference complete — plots look excellent; A027 E2E running; E033 chain-break fixed and restarted at epoch 105)
+Last updated: 2026-09-17 (E039 ported from sandbox to canonical repo and smoke-tested — PASSED (job 58472497), joint mass_x/mass_y + cone-mass CFG dropout mechanism verified both by standalone tensor-logic check and a 1-epoch training run (clean dropout telemetry, no NaN/Inf); production submit script `submit_e039_perlmutter_train.sh` ready, awaiting go-ahead to submit. A035 complete, plots built — ELBO posterior on A033's stage-1-conditioned events; true mass ranked #1/144, #4/144, #6/144, #11/144 across the four holdout points, posterior fairly flat near truth. Artifact: https://claude.ai/artifact/Axw9xz1LQCu8jwptwVWZvg . A036 still PENDING (job 58472184) — same ELBO scoring but on A034's truth-conditioned events. E038 still training, ~70/200 epochs, val_loss~4.97, still flat.)
 
 ---
 
@@ -10,17 +10,25 @@ Last updated: 2026-08-05 (E034 epoch 42/200 training; A027t truth-cond inference
 
 | ID | Status | Submitted | Type | Run name | Slurm job | Notes |
 |----|--------|-----------|------|----------|-----------|-------|
+| E039 | RUNNING | 2026-09-17 | training | `bsm_grid_event_c_stage1_cfg_asym_e039` | 58490841 (self-resubmitting) | Joint mass_x/mass_y + cone-mass CFG dropout — same drop_X/drop_Y draws zero both `y`'s mass hypothesis (idx 20/27) and `x['input_event']`'s cone mass, closing the leakage path where the model could infer a dropped cone mass from the ever-present mass hypothesis. Ported from sandbox to `PET_pp_parton_vpar_bsm_event_c_stage1_cfg_asym_e039.py` / `bsm_grid_train_event_c_stage1_cfg_asym_e039.py`; cfg_drop_x_prob=cfg_drop_y_prob=0.35 (E038's value); submit script `submit_e039_perlmutter_train.sh`; smoke-tested 2026-09-17 (standalone masking-logic check + 1-epoch GPU run, both clean, see E039 detail section). |
+| A036 | RUNNING (3/4 done) | 2026-09-17 | inference (ELBO posterior, truth-conditioned) | `bsm_grid_event_c_stage1_cfg_asym_e038_snap_e043/mass_inference_a036_composable_truthjet_gs1p5` | 58472184 (array, 4 tasks) | ELBO posterior on A034's truth-conditioned composable-CFG generated events (`infer_composable_truthjet_gs1p5`), scoring against all 144 grid hypotheses; same script/model/grid/n_obs(100)/n_t(100)/chunk(100) as A035, only `--npz_dir` changed. Verified `jets_gen[:,1:]` in A034's NPZs exactly equals `event_feat_truth` (`--use_truth_jet` bypasses stage-1 sampling), so event conditioning for scoring here is genuine truth-level information, not stage-1's predicted event features — direct truth-vs-predicted-conditioning comparison against A035. Submit script: `submit/submit_a036_perlmutter_elbo_composable_truthjet.sh`. n_obs=100 pass: 3/4 points complete (250,250)/(250,300)/(300,300); (300,250) now running (job 58472184_2). Plots (3 points, with A035 rank comparison): https://claude.ai/artifact/C9VcmH4yo3xF71CEfknxz2 . Ranks vs A035 at n_obs=100: (250,250) 11→12 (worse), (250,300) 4→2 (better), (300,300) 1→2 (worse, lost the exact hit) — not a clean trend at n=3, and not a fair comparison to A035 anyway (A035 also only used n_obs=100, below the A028-A032 precedent of 2000). **2026-09-17: rerunning at n_obs=2000** (user request, matching A028-A032 precedent) — required first regenerating A034's truth-conditioned events at n_total=2000 (submit_a034_perlmutter_truthjet_n2000.sh, job 58492907, writes to new dir `infer_composable_truthjet_gs1p5_n2000`, original 100-event A034 output untouched), then rescoring at n_obs=2000/n_t=100/chunk=500 (submit_a036_perlmutter_elbo_composable_truthjet_n2000.sh, job 58492909, chained via `--dependency=aftercorr` on the regeneration array so each mass point's scoring waits on its own regeneration). No checkpoint/resume in the generation script (10h ceiling per task, clean resubmit needed if truncated); the rescoring script does self-resubmit via its existing checkpoint mechanism. Note: A035 remains at n_obs=100, so once this completes, A035 would need the same n2000 treatment for a fair A035-vs-A036 comparison — flagged, not yet requested. |
+| E038 | RUNNING | 2026-09-09 | training | `bsm_grid_event_c_stage1_cfg_asym_e038` | 58124738 (self-resubmitting) | Retrain of E036 arch with cfg_drop_x_prob=cfg_drop_y_prob=0.35 (independent Bernoulli, up from 0.10/0.10) → drop_none=42.25% drop_X=22.75% drop_Y=22.75% drop_both(v_null)=12.25% (vs E036's 81/10/10/1%); pairs with new generate_composable_cfg/DDPMSamplerComposableCFG inference (PET_pp_parton_vpar_bsm_event_c_stage1_cfg_asym.py, additive — generate_asym_cfg untouched, E036 ckpt unaffected); submit script `submit_e038_perlmutter_train.sh`; smoke-tested 2026-09-09 (both training script and generate_composable_cfg passed, see E038 detail section) |
+| E036 | COMPLETE | 2026-08-14 | training | `bsm_grid_event_c_stage1_cfg_asym` | 57018200 (done) | Asymmetric per-cone CFG dropout; p_x=p_y=0.10 independent; ep200/200 val_loss=4.9704; ckpt written 2026-08-27 |
+| A032 | RUNNING | 2026-08-14 | inference (ELBO posterior) | `bsm_grid_event_c_stage1_cfg/mass_inference_a032_s7p5` | 56974255 (array, 4 tasks; self-resubmitting) | ELBO posterior on E035 s=7.5 generated events; 2000 events × 100 MC timesteps × 144 hypotheses; comparison vs A028 (s=1.5) and A031 (s=5.0) |
+| A031 | RUNNING | 2026-08-14 | inference (ELBO posterior) | `bsm_grid_event_c_stage1_cfg/mass_inference_a031_s5p0` | 56974254 (array, 4 tasks; self-resubmitting) | ELBO posterior on E035 s=5.0 generated events; 2000 events × 100 MC timesteps × 144 hypotheses; comparison vs A028 (s=1.5) and A032 (s=7.5) |
+| A030 | RUNNING | 2026-08-09 | inference (ELBO posterior) | `bsm_grid_event_c_stage1_cfg/mass_inference_a030_s1p5_fixcone` | 56658069 (array, 4 tasks; self-resubmitting) | ELBO posterior on A029 cone+MET-fixed events; 2000 events × 100 MC timesteps × 144 hypotheses; 4h limit + --max_minutes 225 clean exit + checkpoint/resume; 58–63/144 done in first pass |
+| A029 | COMPLETE | 2026-08-09 | post-processing | `infer_cfg_sweep/s1p5_fixcone` | — (login node) | Cone mass + cone-preserving MET fix on s=1.5 NPZs; cone X |Δm| 126→0.9 GeV; cone Y |Δm| 122→0.25 GeV; MET residual 38→0.001 GeV; 4 NPZs written |
+| A028 | RUNNING | 2026-08-09 | inference (ELBO posterior) | `bsm_grid_event_c_stage1_cfg/mass_inference_a028_s1p5` | 56658068 (array, 4 tasks; self-resubmitting) | ELBO posterior on E035 s=1.5 generated events; 2000 events × 100 MC timesteps × 144 hypotheses; 4 holdout pts; 4h limit + --max_minutes 225 clean exit + checkpoint/resume; 58–63/144 done in first pass |
+| E035 | COMPLETE | 2026-08-08 | inference sweep | `bsm_grid_event_c_stage1_cfg/infer_cfg_sweep/s{scale}` | 56448872 (24/24 tasks done) | CFG guidance scale sweep on E034 ep43; cone mass W1 flat across all scales (~0.066); guidance not yet effective at epoch 43; logpT degrades above s=5; optimal s=1.0–1.5 for now |
 | A027 | RUNNING | 2026-08-05 | inference (E2E, CFG) | `bsm_grid_event_c_stage1_cfg/infer_holdout_e2e` | 55033664 | E034 ep42 E2E; guidance_scale=1.5; 4 holdout pts × 2k × 500 steps; plot job 55033666 chained |
-| E034 | RUNNING | 2026-08-01 | training | `bsm_grid_event_c_stage1_cfg` | 55030598 (chain: 55031907 queued) | CFG: epoch 42/200, val_loss=4.975; cone mass dropout (prob=0.15); two-pass CFG at inference; self-resubmitting chain |
-| E033 | RUNNING | 2026-07-26 | training | `bsm_grid_event_c_locality` | 55032818 (chain: 55032819 queued) | Epoch 105/200, val_loss=5.021; restarted 2026-08-05 after ARG_MAX chain-break at ep105; LD_LIBRARY_PATH accumulation bug fixed |
+| E034 | COMPLETE | 2026-08-01 | training | `bsm_grid_event_c_stage1_cfg` | 56971957 (done) | CFG: epoch 200/200, val_loss=4.9670; cone mass dropout (prob=0.15); two-pass CFG at inference; ckpt written 2026-08-24 |
 | A026t | COMPLETE | 2026-07-26 | inference (truth-cond) | `bsm_grid_event_c_stage1_mpi_snap_e127/infer_holdout_truth_hpc3` | 54529102 | E032 ep127 --use_truth_jet --use_true_event; stage-2 only; 4 holdout pts × 5k × 500 steps; all 4 NPZs written |
 | A025 | COMPLETE | 2026-07-26 | diagnostic | `diag_mass_overlay` | — (login node) | Gen cone-X sep: 8 GeV (38% of truth 21 GeV); gen cone-Y sep: 3 GeV (17% of truth 18 GeV); explains flat A022 posterior |
 | A021-t | PENDING | 2026-07-21 | inference (truth-cond) | `bsm_grid_event_c_stage1_mpi/infer_holdout_truth` | 56205487 | E032 mid-training truth-cond; --use_truth_jet --use_true_event; 4 holdout pts × 5k; epoch 95 ckpt |
 | A021-s1 | PENDING | 2026-07-21 | inference (stage-1 only) | `bsm_grid_event_c_stage1_mpi/infer_holdout_stage1only` | 56205483 | E032 stage-1 only; new --stage1_only flag; saves jets_gen(N,8) only; 4 holdout pts × 5k |
 | A021 | PENDING | 2026-07-21 | inference (e2e) | `bsm_grid_event_c_stage1_mpi/infer_holdout_e2e` | 56205482 | E032 mid-training e2e; 4 holdout pts × 5k × 500 steps; epoch 95 ckpt |
 | A020-t | PENDING | 2026-07-21 | inference (truth-cond) | `bsm_grid_event_c_layers4_mpi/infer_holdout_truth` | 56205479 | E031 mid-training truth-cond; --use_truth_jet; 4 holdout pts × 5k × 500 steps; epoch 34 ckpt |
-| E032 | RUNNING | 2026-07-13 | training | `bsm_grid_event_c_stage1_mpi` | 56194245 (pending continuation) | BSM grid stage-1 on MPI-on W' data; epoch 95/200, val_loss=4.970; self-resubmitting chain |
-| E031 | RUNNING | 2026-07-13 | training | `bsm_grid_event_c_layers4_mpi` | 56258645 (pending continuation) | BSM grid layers4 on MPI-on W' data; epoch 34/200, val_loss=5.279; self-resubmitting chain |
+| E031 | CANCELLED | 2026-07-13 | training | `bsm_grid_event_c_layers4_mpi` | 56943906 cancelled 2026-08-14 | Horovod allreduce deadlock at epoch 90 (rank 0 graph divergence); cancelled — superseded by E034 as primary training experiment |
 | E016 | PLANNED | — | validation | `parnassus_validation` | — | Test Parnassus output on W'→4q signal; compare to dijet training-domain behavior |
 
 ---
@@ -38,7 +46,11 @@ Last updated: 2026-08-05 (E034 epoch 42/200 training; A027t truth-cond inference
 ## Recently completed experiments
 
 | ID | Completed | Type | Run name | Key result | Notes |
+| A035 | 2026-09-15 | inference (ELBO posterior) | `bsm_grid_event_c_stage1_cfg_asym_e038_snap_e043/mass_inference_a035_composable_gs1p5` | Event conditioning used stage-1's predicted `jets_gen` (not truth — see A036 for the truth-conditioned analog). All 4 tasks completed cleanly, no errors, ~66 min/task. True-mass recovery (exact rank computed from full 144-point posterior, not eyeballed from the printed top-5): (250,250) best-fit (200,250), true ranked **#11**/144 (ΔLL=0.0182 from best); (250,300) best-fit (300,300), true ranked **#4**/144 (ΔLL=0.0130); (300,250) best-fit (300,300), true ranked **#6**/144 (ΔLL=0.0180); (300,300) best-fit (300,300), **exact hit**, rank #1. Log-likelihoods across the top ranks are tightly clustered (~0.01–0.02 nats spread even out to rank 11) — posterior is fairly flat near the true region rather than sharply peaked, consistent with A022/A028's earlier flat-posterior finding at this training stage. Plots (heatmaps + profile likelihoods, all 4 points): https://claude.ai/artifact/Axw9xz1LQCu8jwptwVWZvg | Job 58381015 (array, 4 tasks); scored A033's composable-CFG generated events (`infer_composable_gs1p5`) against all 144 grid hypotheses; 100 events × 100 MC timesteps/hypothesis. Plots not yet made. |
+| A034 | 2026-09-15 | inference (composable CFG, truth-conditioned) | `bsm_grid_event_c_stage1_cfg_asym_e038_snap_e043/infer_composable_truthjet_gs1p5` | Truth-conditioning collapses A033's large asymmetric cone-mass bias into a small, consistent one. A033 (stage-1-conditioned) cone mass bias vs A034 (truth-conditioned), cmX / cmY: (250,250) -33/+49 -> +9/+3 GeV; (250,300) -21/+23 -> +20/+5 GeV; (300,250) -80/+90 -> +12/+4 GeV; (300,300) -61/+41 -> +14/+15 GeV. Points to stage-1's imperfect event-feature generation, not stage-2's particle placement, as the dominant source of A033's bias — stage-2 does a much better job of reconstructing the correct cone mass once it isn't fed stage-1's noisy conditioning. Note: multiplicity (npart) matches truth *exactly* in A034 by construction (--use_truth_jet supplies truth log_npart directly, bypassing stage-1's own npart generation) — not a stage-2 result. | Oracle-style complement to A033: same checkpoint/formula/gs=1.5, but `--use_truth_jet` so stage-2 conditions on the true `[log_npart, 7 event feats]` instead of stage-1's generated output (stage-1 sampling skipped entirely). Found and fixed a second bug en route: `infer_composable.py`'s `jet_truth` was only the 1-dim log_npart (inherited from `infer_asym.py`, never fixed there either), so `--use_truth_jet` silently supplied empty event features instead of truth ones; fixed to concatenate the truth event-feature vector too, verified by checking `jets_gen[:,1:]` exactly matches `event_feat_truth` in a smoke test. 100 events/point, 500 steps. Cone mass here is reconstructed from the *generated particle cloud* (ΔR<1.0 clustering around the truth parton direction), not read from `jets_gen` (which is a trivial echo of truth under `--use_truth_jet`, not a stage-2 result) — same reconstruction method as A033 for direct comparability. Linked: A033 (stage-1-conditioned comparison), A035 (ELBO, pending). |
+| A033 | 2026-09-15 | inference (composable CFG, partial ckpt) | `bsm_grid_event_c_stage1_cfg_asym_e038_snap_e043/infer_composable_gs1p5` | All 4 holdout mass points generated cleanly, no errors after the OOM fix; multiplicity tracks truth closely (truth/gen mean): (250,250) 278.5/280.6, (250,300) 278.6/283.6, (300,250) 271.9/283.7, (300,300) 285.0/289.0. Cone-mass diagnostic plots (built 2026-09-15, artifact below) show a consistent directional bias at this epoch: cone_mass_X under-generated (median off by ~30-80 GeV low across all 4 points) and cone_mass_Y over-generated (~40-90 GeV high) — not random noise, same direction every mass point; worth re-checking once E038 finishes training to see if it's an early-training artifact or persists. | Diagnostic on E038's mid-training checkpoint (epoch 43/200, val_loss=4.9737, snapshotted to `..._e038_snap_e043` to avoid a race with the live training job). New script `scripts/infer_composable.py` (copy of `infer_asym.py` with `generate_asym_cfg`→`generate_composable_cfg`, since `infer_asym.py` was never updated to call the formula E038 is actually paired with). Hit and fixed a real bug mid-run: `DDPMSamplerComposableCFG` still had the `@tf.function` decorator that was already removed from `DDPMSamplerAsymCFG` during the E037 fix — caused an immediate OOM (`[300,4,500,500]` attention tensor) at chunk_size=100; removed the decorator (canonical repo + sandbox `Pet_pp.py`, zero risk to the live E038 training job since `train_step` never calls this method), reran at chunk_size=50, ~11-13 min/100-event mass point, no further issues. gs_X=gs_Y=1.5 (E037's comparison point), 100 events/point, 500 steps, stats reused from E034. Sanity-plot artifact (9 observables × 4 mass points, truth vs. gen): https://claude.ai/artifact/CCnDmvqD4c5sfxiFWh6sp3 . ELBO posterior scoring → A035; truth-conditioned comparison → A034. |
 |----|-----------|------|----------|------------|-------|
+| E037 | 2026-09-02 | inference sweep | `bsm_grid_event_c_stage1_cfg_asym/infer_cfg_sweep/sX{pair}` | Asym CFG sweep on E036 ckpt complete (5000 events/mass point at gs_X=gs_Y=1.5 pair); cone-mass generation quality visibly worse than E035 (symmetric CFG) at the comparable scale — root cause diagnosed 2026-09-09: `generate_asym_cfg`'s formula `v_null + gs_x*(v_full-v_no_x) + gs_y*(v_full-v_no_y)` has v_full's coefficient = gs_x+gs_y (3.0 at gs_x=gs_y=1.5, vs a single scale of 1.5 in E034's 2-pass formula), and its v_null anchor was trained on only ~1% of E036 batches (independent Bernoulli(0.10) per cone → drop_both=1%) | Job 57867490 (array, 40 tasks); 10 (gs_X,gs_Y) pairs × 4 holdout mass pts × 500 steps; fix: removed @tf.function from DDPMSamplerAsymCFG to avoid 4-pass graph memory accumulation; motivates E038 |
 | A027t | 2026-08-05 | inference (truth-cond) | `bsm_grid_event_c_stage1_cfg/infer_holdout_truth` | E034 ep42; all 4 NPZs written; full plot suite complete; distributions look excellent — generated peaks well-centered on truth masses, rel-W₁ ~0.019 mean for cone masses | Job 55033665; 2k events/pt; guidance_scale N/A (truth bypass); artifact: https://claude.ai/code/artifact/36bfa564-051f-433d-8870-8924bfa171fb |
 | A024-fixmet | 2026-07-26 | post-processing + plots | `infer_holdout_e2e_fixmet` | MET residual 35 GeV → <0.002 GeV; new plot set at `plots_a024_e2e_fixmet/` | apply_fix_met.py applied to all 4 A024 NPZs; 9–16 particles skipped/mass point; gallery at artifact 3f642400 |
 | A022 | 2026-07-26 | mass posterior (ELBO) | `bsm_grid_event_c_layers4_mpi_snap_e054` | All 4 mass points scored; argmax misses in all cases; posterior nearly flat (ΔLL range 0.33–0.44 nats) | 54491919 completed; E031 ep54 mid-training; true mass ranks 5,5,10,50 / 144; artifact 328590f1 |
@@ -90,6 +102,57 @@ Last updated: 2026-08-05 (E034 epoch 42/200 training; A027t truth-cond inference
 ## Experiment details
 
 (Most recent first.)
+
+---
+
+### E038 — Raised per-cone CFG dropout + composable-diffusion inference (STAGED)
+
+- **Date staged:** 2026-09-09
+- **Goal:** Fix the two problems diagnosed in E037: (1) `generate_asym_cfg`'s formula double-counts `v_full` — its coefficient on `v_full` is `gs_x+gs_y`, not a single guidance scale, so `gs_x=gs_y=1.5` (chosen by analogy to E034's neutral-ish `s=1.5`) actually applies a 3.0x push, well past this formula's true neutral point of `gs_x+gs_y=1`; (2) the joint-drop branch `v_null`, which the formula anchors on, was trained on only ~1% of E036's batches (`drop_both = p_x·p_y` with independent Bernoulli(0.10) per cone).
+- **Training change:** Same script as E036 (`bsm_grid_train_event_c_stage1_cfg_asym.py`), only `--cfg_drop_x_prob`/`--cfg_drop_y_prob` raised from 0.10/0.10 to **0.35/0.35**. Still independent Bernoulli (user's explicit choice over switching to categorical/decoupled sampling). Expected marginals: `drop_none=42.25%  drop_X=22.75%  drop_Y=22.75%  drop_both=12.25%` (vs E036's `81/10/10/1%`). `drop_both≈12.25%` is close to E034's flat 15% joint-drop rate. The same change also raises `v_no_x`/`v_no_y` exposure from 10%→22.75% each, which matters because those are the branches the new inference formula (below) actually anchors its guidance on.
+- **Checkpoint dir:** `bsm_grid_event_c_stage1_cfg_asym_e038` (separate from E036's `bsm_grid_event_c_stage1_cfg_asym` — E036 checkpoint untouched).
+- **Submit script:** `submit/submit_e038_perlmutter_train.sh` (account m2616, 4 GPUs, self-resubmitting to 200 epochs, reuses E034's normalisation stats).
+- **Inference change:** New method `generate_composable_cfg` / `DDPMSamplerComposableCFG` / `second_order_correction_composable_cfg`, added to `scripts/PET_pp_parton_vpar_bsm_event_c_stage1_cfg_asym.py` (additive only — `generate_asym_cfg` and friends are untouched and still used for E036/E037 reproducibility). Standard composable-diffusion formula (Liu et al.), generalized to two independent conditioning signals:
+  ```
+  v_guided = v_null + gs_x*(v_no_y - v_null) + gs_y*(v_no_x - v_null)
+  ```
+  `v_full` never appears in the combination, so it cannot be double-counted regardless of `gs_x`/`gs_y`. Only 3 model passes per step (vs E037's 4).
+- **Open risk:** `drop_none` fell from 81%→42.25%, a much bigger sacrifice of fully-conditioned training exposure than E034 accepted (85%→ well, E034 doesn't have a `drop_none` in this sense — its joint dropout is 85/15 conditioned/null). If E038's un-guided (`gs_x=gs_y=0`) quality regresses vs E036, the next lever is lowering `p_x=p_y` toward ~0.30 rather than changing the formula.
+- **Linked experiments:** E036 (architecture/training source), E037 (diagnosed the bug this fixes), E034/E035 (symmetric CFG baseline for comparison).
+- **Next steps after training:** (1) sanity-check `generate_composable_cfg` at `gs_x=gs_y=0` reduces cleanly to `v_null`; (2) repeat the E037-style (gs_X,gs_Y) sweep with the composable formula on the E038 checkpoint; (3) compare cone-mass W₁ against E035 (symmetric) and E037 (old asym formula) at matched guidance strength.
+- **Smoke test (2026-09-09, interactive gpu_debug qos, 1 GPU, throwaway `run_name=smoke_e038_cfg_asym`, deleted after):** (1) training script with `--cfg_drop_x_prob 0.35 --cfg_drop_y_prob 0.35`, n_train=64/file × 144 files, n_val=32, 1 epoch — exit 0, `training_state.json` done=true, val_loss=6.524, no NaNs; observed dropout telemetry drop_X=0.352 drop_Y=0.355 drop_both=0.119 drop_none=0.411, matching the 0.35/0.35/0.1225/0.4225 targets within batch-level noise. (2) `generate_composable_cfg`/`DDPMSamplerComposableCFG` run against the existing E036 checkpoint (arch-identical) at gs=1.5/1.5, gs=0/0 (null limit), and nsplit=2 — 13/13 checks passed (shapes, all-finite, no exceptions). Both passed on the first attempt, no fixes needed.
+- **Submitted:** 2026-09-09, job 58124738 (`sbatch submit_e038_perlmutter_train.sh`), self-resubmitting to 200 epochs.
+
+---
+
+### E037 — Asymmetric CFG guidance-scale sweep (inference only, E036 checkpoint) — root cause diagnosed
+
+- **Date completed:** 2026-09-02 (job 57867490, 40/40 array tasks). **Root cause diagnosed:** 2026-09-09.
+- **What ran:** 10 `(gs_X, gs_Y)` pairs × 4 holdout mass points × 5000 events × 500 steps, using `generate_asym_cfg` on the E036 checkpoint.
+- **Result:** Cone-mass generation at `gs_X=gs_Y=1.5` (the pair directly comparable to E035's symmetric `s=1.5`) was visibly worse than E035 — broader, less-peaked cone mass distributions in linear GeV, despite E035 and E036 having nearly identical stage-1 (`jets_gen`) output distributions for the same holdout points (log-mean differs by only ~0.02 between them).
+- **Interpretation:** The regression is a formula bug, not a training/architecture problem. Expanding `generate_asym_cfg`'s formula, `v_guided = v_null + gs_x*(v_full-v_no_x) + gs_y*(v_full-v_no_y)`, the coefficient on `v_full` is `gs_x+gs_y` — 3.0 at `gs_x=gs_y=1.5`, vs. a single scale of 1.5 in E034's 2-pass formula (`v_uncond + s*(v_cond-v_uncond)`). This formula's true neutral point (reduces exactly to `v_full`) is `gs_x+gs_y=1`, not `gs_x=gs_y=1` as assumed when the 1.5/1.5 sweep point was chosen by analogy to E034. Compounding this, `v_null` — the formula's anchor — was trained on only ~1% of E036's batches (independent per-cone Bernoulli(0.10) gives `drop_both=p_x·p_y=0.01`), so even the anchor itself is poorly calibrated.
+- **Follow-up:** E038 (raised dropout to fix `v_null` exposure + new composable-diffusion inference formula that never references `v_full`).
+
+---
+
+### E035 — CFG guidance scale sweep (inference only, E034 checkpoint)
+
+- **Date staged:** 2026-08-05
+- **Checkpoint:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_stage1_cfg/pet_pp.weights.h5` (epoch 43, val_loss=4.979)
+- **Submit script:** `submit/submit_e035_perlmutter_cfg_sweep.sh` (24-task SLURM array)
+- **Analysis script:** `scripts/analyze_cfg_sweep.py`
+- **Output base:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_stage1_cfg/infer_cfg_sweep/s{scale}/`
+- **Plots:** `.../plots_e035/`
+
+**Design:** Pure inference sweep — no retraining. Tests CFG guidance formula `v_guided = v_null + s*(v_cond - v_null)` at s ∈ {1.0, 1.5, 3.0, 5.0, 7.5, 10.0} for each of the 4 held-out W' mass points (250,250), (250,300), (300,250), (300,300). 24 tasks total (1 GPU each). Each run: 5000 events, 500 DDPM steps.
+
+**Metrics:** Stage-1 rel-W₁ for cone_mass_{X,Y}, cone_pT_{X,Y}, MET; stage-2 particle-level rel-W₁ for η, logpT, φ, multiplicity; empirical FWHM for cone masses X/Y.
+
+**Motivation:** s=1.0 is unguided conditional pass; s>1.0 sharpens the cone mass conditioning at the cost of diversity. Expect an optimum somewhere in [1.5, 5.0] where mass separation improves without degrading particle-level fidelity.
+
+**Results (2026-08-08):** 24/24 NPZs complete. Cone mass rel-W1 is flat at ~0.066 (cm_X) and ~0.064 (cm_Y) across all six guidance scales — no improvement from CFG at any tested scale. Particle-level logpT begins degrading above s=5 (rel-W1 0.0035→0.0068) and φ rises monotonically (0.0009→0.0034 at s=10), so high guidance hurts fidelity without any cone mass gain. FWHM shows no consistent sharpening trend. Optimal scale for now: s=1.0–1.5.
+
+**Interpretation:** The conditioning signal from cone masses is not yet strong enough in the epoch-43 checkpoint for the unconditional/conditional gradient to carry useful information — the model may not yet have learned to cleanly separate the two passes. Motivates: (a) re-running sweep after E034 training converges further, or (b) increasing CFG dropout probability (currently 0.15) in a follow-up run to widen the conditional/unconditional gap.
 
 ---
 
@@ -148,6 +211,69 @@ Last updated: 2026-08-05 (E034 epoch 42/200 training; A027t truth-cond inference
 - **Submit script:** `submit/submit_e034_hpc3_train.sh`
 - **Status:** RUNNING — epoch 42/200
 - **Linked experiments:** E023 (base architecture), E032 (MPI variant), E033 (independent alternative), A025/A026t (diagnostic motivation), A027t/A027 (interim inference)
+
+---
+
+### A030 — ELBO posterior inference on cone+MET-fixed s=1.5 events (A029 output)
+
+- **Date staged:** 2026-08-09
+- **Type:** Inference (ELBO mass posterior)
+- **Cluster:** Perlmutter
+- **Goal:** Test whether the cone+MET postprocessing (A029) translates to improved mass resolution in the ELBO posterior. Comparison baseline: A028 (raw s=1.5 events). If postprocessing helps, the posterior peak should be sharper and closer to truth for at least the cone-mass-sensitive holdout points.
+- **Method:** Same ELBO scoring as A028 — score 2000 events against 144 grid hypotheses using 200 MC timestep samples. Input changed to s1p5_fixcone NPZs.
+- **Submit script:** `submit/submit_a030_perlmutter_elbo_fixcone.sh` (4-task array, 1 GPU each, 4h)
+- **Output dir:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/checkpoints_bsm_grid/bsm_grid_event_c_stage1_cfg/mass_inference_a030_s1p5_fixcone/`
+- **Scripts:** `scripts/infer_bsm_mass_posterior_cfg.py`, `scripts/plot_a022_mass_posterior.py`
+- **Slurm job:** 56533646 (4-task array, 4h limit)
+- **Status:** RUNNING
+- **Linked experiments:** A028 (raw s=1.5 ELBO; comparison), A029 (postprocessed input), E035 (inference sweep source)
+
+---
+
+### A029 — Cone mass + cone-preserving MET postprocessing on s=1.5 events
+
+- **Date completed:** 2026-08-09
+- **Type:** Post-processing (CPU, login node)
+- **Goal:** Sequentially fix cone masses and MET in the E035 s=1.5 generated events, providing higher-fidelity particle clouds for ELBO mass inference (A030). The generated cone masses are ~126–141 GeV off from stage-1 predictions at epoch 43.
+- **Script:** `scripts/apply_fix_cone_met.py`
+- **Input dir:** `.../infer_cfg_sweep/s1p5/` (4 NPZs, 5000 events each)
+- **Output dir:** `.../infer_cfg_sweep/s1p5_fixcone/` (4 NPZs, same count)
+- **Stats file:** `/pscratch/sd/l/lcondren/MCsim/wprime_signal_mpi/checkpoints_bsm_grid/normalisation_stats_event_c_stage1_cfg.json`
+- **Method:**
+  1. **Cone mass fix:** For cones X (parton slot 2) and Y (parton slot 3), scale in-cone particle pT by λ = m_target/m_curr (capped [0.1, 10.0]). Directions unchanged; exact mass hit.
+  2. **Cone-preserving MET fix (`fix_met_out_of_cone`):** Apply uniform (Δpx, Δpy) correction ONLY to particles outside BOTH cones. Preserves in-cone particle momenta (and thus fixed cone masses). Falls back to all-particle correction for events with no out-of-cone particles.
+- **Results:**
+
+  | Mass point | Cone X |Δm| before | Cone X |Δm| after | Cone Y |Δm| before | Cone Y |Δm| after | MET before | MET after |
+  |---|---|---|---|---|---|---|
+  | (250,250) | 126.7 GeV | 0.89 GeV | 121.7 GeV | 0.25 GeV | 37.9 GeV | 0.00067 GeV |
+  | (250,300) | 130.6 GeV | 0.84 GeV | 127.0 GeV | 0.21 GeV | 37.7 GeV | 0.00025 GeV |
+  | (300,250) | 141.0 GeV | 0.65 GeV | 128.9 GeV | 0.47 GeV | 37.5 GeV | 0.00063 GeV |
+  | (300,300) | 140.8 GeV | 0.34 GeV | 132.0 GeV | 0.19 GeV | 37.7 GeV | 0.00103 GeV |
+
+- **Intermediate MET residual:** After cone fixes, before MET fix: ~1060–1134 GeV. This is expected — cone pT scaling by λ~0.85–0.92 on ~42 in-cone particles redistributes ~1000 GeV of transverse momentum. The OOC-only fix absorbs this without touching the cones.
+- **Notes:**
+  - AFTER cone mass residuals are reported using the original (pre-MET-fix) cone membership masks. Recomputing cone masks after MET fix picks up OOC particles whose directions shifted under the large momentum kick, artificially inflating the reported residual. The in-cone particle pT is unchanged by the MET fix.
+  - RuntimeWarning `divide by zero in true_divide` for λ calculation is benign — numpy `where` evaluates both branches; zero-mass cones are excluded by `can_fix` mask.
+- **Interpretation:** The cone mass fix succeeds at sub-GeV precision for all 4 mass points. The MET correction is accurate to < 1 MeV. The overall postprocessing reduces the two largest deviations from stage-1 predictions (cone masses, MET) to near-zero. Whether this translates to improved ELBO mass resolution remains to be seen in A030 — if the ELBO model's loss landscape is sensitive to these quantities, A030 should show sharper posteriors than A028.
+- **Linked experiments:** A028 (ELBO on raw s=1.5; comparison), A030 (ELBO on fixed events), E035 (source events)
+
+---
+
+### A028 — ELBO posterior inference on E035 s=1.5 generated events
+
+- **Date submitted:** 2026-08-09
+- **Type:** Inference (ELBO mass posterior)
+- **Cluster:** Perlmutter
+- **Goal:** Score E035 CFG-generated events (guidance_scale=1.5) against all 144 grid mass hypotheses using the ELBO loss. Tests whether the diffusion model assigns higher probability to the correct (mX, mY) pair, even with unguided conditional generation at epoch 43.
+- **Method:** `infer_bsm_mass_posterior_cfg.py` — adapted from `infer_bsm_mass_posterior.py` for CFG architecture and NPZ input. ELBO score per hypothesis: `score(x,θ) = -E_t[||v_θ(x_t,t|cond(θ)) - v_true||²]` averaged over 200 MC timestep samples and 2000 events. Event conditioning uses `jets_gen[:,1:]` (stage-1 predicted event features — same as used to condition stage-2 generation). Part conditioning uses `parton_feat[:,:,:6]`.
+- **Input NPZ dir:** `.../infer_cfg_sweep/s1p5/` (4 NPZs, 5000 events each; 2000 used)
+- **Output dir:** `.../mass_inference_a028_s1p5/` (4 `posterior_mX???_mY???.npz` files)
+- **Slurm job:** 56533190 (4-task array, 1 GPU each, 4h limit)
+- **Submit script:** `submit/submit_a028_perlmutter_elbo_cfg.sh`
+- **Status:** RUNNING — job 56533190
+- **Next step:** When complete, run `scripts/plot_a022_mass_posterior.py --npz_dir .../mass_inference_a028_s1p5/`
+- **Linked experiments:** A030 (ELBO on fixed events; comparison), A029 (postprocessing), E035 (source events), A022 (prior ELBO on E031 events)
 
 ---
 
@@ -904,6 +1030,27 @@ Last updated: 2026-08-05 (E034 epoch 42/200 training; A027t truth-cond inference
 ---
 
 ## Planned experiments (not yet submitted)
+
+### E039 — Joint mass-hypothesis + cone-mass CFG dropout (PLANNED — not yet scoped)
+
+- **Date proposed:** 2026-09-13, during a sandbox code-walkthrough session (not yet staged, no code written).
+- **Origin:** While tracing `train_step` in `PET_pp_parton_vpar_bsm_event_c_stage1_cfg_asym.py` (E035/E036/E038's model file), observed that the existing per-cone CFG dropout (E035/E036: p=0.10 each; E038: raised to 0.35 each) only ever zeros `cone_mass_X`/`cone_mass_Y` — indices 4/6 of `x['input_event']`, the *measured* per-event cone-cluster invariant mass. The parton-conditioning vector `y` — which carries the *fixed* `mass_x`/`mass_y` hypothesis injected into parton slots 2/3 via `mass_col` at data-prep time — is **never** dropped, for either stage, at any dropout rate tried so far.
+- **Hypothesis:** Because `mass_x`/`mass_y` is always present, the current "null" branch isn't a true unconditional state — the model can substantially infer the "missing" cone mass from the ever-present mass hypothesis (the two are strongly correlated by construction: the cone is supposed to reconstruct near the true resonance mass). This weakens the `v_full` vs `v_null` contrast CFG guidance depends on. Jointly dropping `mass_x`/`mass_y` together with `cone_mass_X`/`cone_mass_Y` (same per-event Bernoulli flag driving both) should produce a much more genuine informational gap between conditioned and unconditioned generation, and likely give CFG guidance real strength it may currently lack.
+- **Proposed mechanism:** Reuse one event-level Bernoulli draw to jointly (a) zero `cone_mass_X`/`cone_mass_Y` in `x['input_event']` (as today) and (b) zero the injected `mass_col` feature for parton slots 2/3 in `y`/`cond`. Deliberately **joint**, not independent per-axis — see obstacle 2 below.
+- **Known obstacles (flagged during design discussion, not yet resolved):**
+  1. Harder null distribution to learn — it now marginalizes over the whole mass grid, not just "this mass minus its cone summary." Likely needs even more training exposure than E038's 0.35/0.35 to train the null branch well; risks reproducing the exact undertrained-null-branch failure diagnosed in E037 unless exposure is deliberately raised further to compensate.
+  2. `model_jet`'s `_resnet_vpar` mean-pools all 4 parton embeddings (`parton_global = reduce_sum(parton_emb*mask)/count`) before FiLM conditioning — this destroys per-parton (X-only vs Y-only) separability. A per-axis version of this dropout (mirroring `gs_x`/`gs_y` independent guidance) is **not** architecturally supported today without changing that pooling — hence the joint-only proposal above.
+  3. Leakage: `mass_col` only overwrites 1 of 7 features on parton slots 2/3 — the other 6 genuine kinematic columns of those same partons stay un-dropped and are correlated with mass via overall event kinematics, so some leakage into the "null" state is expected even after this change.
+  4. `y`/`cond` is currently precomputed once as a static NumPy array at data-load time; the cone-mass dropout, by contrast, is drawn fresh every `train_step` call. Implementing joint dropout requires moving `cond` construction (or at least this masking step) into `train_step`, a real (if modest) code change.
+- **Linked experiments:** builds on E035/E036 (asymmetric per-cone dropout mechanism) and E038 (raised dropout to fix an undertrained null branch — the same failure mode this proposal risks reproducing if under-provisioned).
+- **Status (2026-09-17): SMOKE-TESTED, ready to submit — not yet submitted for production training.** Implemented first in the sandbox (`pp-collision-diffusion_sandbox/scripts/Pet_pp_e039.py` / `train_e039.py`), then ported to the canonical repo verbatim (same minimal diff, re-verified) as `scripts/PET_pp_parton_vpar_bsm_event_c_stage1_cfg_asym_e039.py` / `scripts/bsm_grid_train_event_c_stage1_cfg_asym_e039.py`. Mechanism: two new 32-dim keep-masks zero `y`'s `mass_x`/`mass_y` (flat cond indices 20/27) using the *same* `drop_X`/`drop_Y` Bernoulli draws that already zero `cone_mass_X`/`cone_mass_Y` in `x['input_event']` — so cone mass and mass hypothesis are always dropped together, closing the leakage path described above. `model_jet` still receives unmodified `y` (deliberately, per obstacle 2 — stage-1's pooling can't support per-axis dropout).
+  - **Verification before any GPU job:** standalone tensor-logic check (no GPU) confirmed index 20 zeroed iff `drop_X`, index 27 zeroed iff `drop_Y`, all other 30 features untouched, across all 4 drop-state combinations.
+  - **Smoke test (2026-09-17, job 58472497, qos=debug, single GPU, throwaway `run_name=smoke_e039_cfg_joint`, deleted after):** 1 epoch, `n_train`≈9,024 events (282 steps @ batch=32), `cfg_drop_x_prob=cfg_drop_y_prob=0.35`. Exit 0, `training_state.json` done=true, val_loss=6.5934 (finite; comparable to E038's own 1-epoch smoke value of 6.524). Epoch-end dropout telemetry: drop_X=0.3493, drop_Y=0.3430, drop_both=0.1188, drop_none=0.4265 — matches the 0.35/0.35/0.1225/0.4225 targets within batch-level noise. No NaN/Inf anywhere in the log. Validation dropout is 0 by design (`test_step` uses full conditioning, inherited unchanged). Passed on the first attempt, no fixes needed.
+  - **Production submit script:** `submit/submit_e039_perlmutter_train.sh` (mirrors `submit_e038_perlmutter_train.sh`: 4 GPUs, self-resubmitting to 200 epochs, E034 stats reused, `cfg_drop_x_prob=cfg_drop_y_prob=0.35`, checkpoint dir `bsm_grid_event_c_stage1_cfg_asym_e039`, separate from E038).
+  - **Submitted 2026-09-17, job 58490841** (user go-ahead given) — PENDING at submission time, queued alongside A036's last task and E038's continuation.
+- **Reminder standing instruction (user, 2026-09-13):** superseded — E039 has now been submitted as a full training experiment (job 58490841); reminder no longer needed once it starts running/completes.
+
+---
 
 ### E022 — bsm_grid_event_c_layers4
 
